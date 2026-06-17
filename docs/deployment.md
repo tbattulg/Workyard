@@ -26,6 +26,7 @@ Do not reuse or modify the existing Invoice Maker Pages project or D1 database.
 - Build command is `npm run build`; output directory is `dist`.
 - Preview and production Pages environments have separate `DB` bindings.
 - Public build variables are set for the neutral display brand and Chicago pilot.
+- Pages logging, Sentry, Web Analytics, and uptime checks should be configured outside `wrangler.jsonc`; Pages currently rejects the Workers-only `observability` field during Git builds.
 
 ## Remaining setup
 
