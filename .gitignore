@@ -1,0 +1,17 @@
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+.wrangler/
+.local-config/
+.dev.vars
+.env
+.env.*
+!.env.example
+*.local
+*.log
+.DS_Store
+build_workyard_project_plan.py
+deliverables/
+qa/
