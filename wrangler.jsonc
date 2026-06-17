@@ -1,0 +1,33 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "workyard-mvp",
+  "pages_build_output_dir": "./dist",
+  "compatibility_date": "2026-06-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "ENVIRONMENT": "local",
+    "PUBLIC_APP_NAME": "Contractor Marketplace",
+    "PUBLIC_APP_URL": "http://localhost:8788",
+    "PILOT_MARKET": "Chicago, IL",
+    "ALLOW_DEMO_AUTH": "true",
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "workyard-db-preview",
+      "database_id": "00000000-0000-0000-0000-000000000001",
+      "migrations_dir": "./migrations",
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "FILES",
+      "bucket_name": "workyard-files-preview",
+    },
+  ],
+  "observability": {
+    "enabled": true,
+    "logs": { "head_sampling_rate": 1 },
+    "traces": { "enabled": true, "head_sampling_rate": 0.05 },
+  },
+}
