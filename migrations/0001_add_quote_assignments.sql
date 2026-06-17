@@ -1,0 +1,2 @@
+ALTER TABLE `quote_requests` ADD `assigned_to_user_id` text REFERENCES users(id);--> statement-breakpoint
+CREATE INDEX `quote_requests_assignee_idx` ON `quote_requests` (`assigned_to_user_id`,`status`,`created_at`);
