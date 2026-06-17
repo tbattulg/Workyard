@@ -3,22 +3,41 @@
 ## Isolated resources
 
 - Pages project: `workyard-mvp`
-- Preview D1: `workyard-db-preview`
-- Production D1: `workyard-db-production`
-- Preview R2: `workyard-files-preview`
-- Production R2: `workyard-files-production`
+- Pages domain: `workyard-mvp.pages.dev`
+- Preview D1: `workyard-db-preview` (`ea7c8407-3717-408d-8392-e15b4b064e89`)
+- Production D1: `workyard-db-production` (`ee9335f0-7089-4c20-b4ae-bfb079cb2795`)
+- Preview R2: `workyard-files-preview` (blocked until R2 is enabled)
+- Production R2: `workyard-files-production` (blocked until R2 is enabled)
 
 Do not reuse or modify the existing Invoice Maker Pages project or D1 database.
 
 ## Required setup
 
 1. Enable R2 in the Cloudflare dashboard.
-2. Create the preview and production D1 databases and R2 buckets.
-3. Connect `tbattulg/Workyard` to the `workyard-mvp` Pages project.
-4. Set `npm run build` as the build command and `dist` as the output directory.
-5. Bind `DB` and `FILES` separately in preview and production.
-6. Add Clerk, Resend, Mapbox, Sentry, and Turnstile values as encrypted secrets.
-7. Apply migrations to preview, verify the preview deployment, then apply to production.
+2. Create the preview and production R2 buckets.
+3. Bind `FILES` separately in preview and production.
+4. Add Clerk, Resend, Mapbox, Sentry, and Turnstile values as encrypted secrets.
+5. Apply migrations to preview, verify the preview deployment, then apply to production.
+
+## Completed setup
+
+- `workyard-mvp` Pages project is connected to `tbattulg/Workyard` with Git deployments.
+- Production branch is `main`.
+- Build command is `npm run build`; output directory is `dist`.
+- Preview and production Pages environments have separate `DB` bindings.
+- Public build variables are set for the neutral display brand and Chicago pilot.
+
+## Remaining setup
+
+1. Replace placeholder `SUPPORT_EMAIL` / URL values with the launch domain and support inbox.
+2. Enable R2 and bind `FILES` to `workyard-files-preview` and `workyard-files-production`.
+3. Add the encrypted provider secrets:
+   - `CLERK_SECRET_KEY`
+   - `CLERK_JWT_KEY`
+   - `RESEND_API_KEY`
+   - `MAPBOX_SECRET_TOKEN`
+   - `SENTRY_DSN`
+   - `TURNSTILE_SECRET_KEY`
 
 ## Release gates
 

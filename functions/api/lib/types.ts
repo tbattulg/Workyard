@@ -1,6 +1,7 @@
 import type { UserRole } from '../../../shared/domain'
 
-export type AppBindings = Env & {
+export type AppBindings = Omit<Env, 'FILES'> & {
+  FILES?: R2Bucket
   CLERK_SECRET_KEY?: string
   CLERK_PUBLISHABLE_KEY?: string
   CLERK_JWT_KEY?: string

@@ -65,7 +65,7 @@ import {
   resolveActor,
 } from './lib/auth'
 import { writeAudit } from './lib/audit'
-import { canAccessFile, MAX_UPLOAD_BYTES, validateFile } from './lib/files'
+import { canAccessFile, MAX_UPLOAD_BYTES, requireFileStorage, validateFile } from './lib/files'
 import { handleError, HttpError, ok, validationFields } from './lib/http'
 import { executeIdempotently } from './lib/idempotency'
 import { createInvoicePdf } from './lib/pdf'
@@ -1696,7 +1696,8 @@ app.post('/invoices/:id/send', async (c) => {
     })
     const fileId = crypto.randomUUID()
     const objectKey = `invoices/${invoice.companyId}/${invoice.id}/revision-${invoice.revisionNumber}.pdf`
-    await c.env.FILES.put(objectKey, pdf, {
+    const fileStorage = requireFileStorage(c)
+    await fileStorage.put(objectKey, pdf, {
       httpMetadata: {
         contentType: 'application/pdf',
         contentDisposition: `attachment; filename="${invoice.invoiceNumber}.pdf"`,
@@ -2026,7 +2027,8 @@ app.post('/uploads', bodyLimit({ maxSize: MAX_UPLOAD_BYTES }), async (c) => {
   const checksumSha256 = Array.from(new Uint8Array(digest), (byte) =>
     byte.toString(16).padStart(2, '0'),
   ).join('')
-  await c.env.FILES.put(objectKey, bytes, { httpMetadata: { contentType: mimeType } })
+  const fileStorage = requireFileStorage(c)
+  await fileStorage.put(objectKey, bytes, { httpMetadata: { contentType: mimeType } })
   await db.insert(files).values({
     id,
     ownerUserId: actor.id,
@@ -2068,7 +2070,8 @@ app.get('/uploads/:id', async (c) => {
   const file = await canAccessFile(c, actor, uuidSchema.parse(c.req.param('id')))
   if (file.scanStatus === 'rejected' || file.scanStatus === 'failed')
     throw new HttpError(403, 'file_unavailable', 'This file is unavailable.')
-  const object = await c.env.FILES.get(file.objectKey)
+  const fileStorage = requireFileStorage(c)
+  const object = await fileStorage.get(file.objectKey)
   if (!object) throw new HttpError(404, 'file_not_found', 'File not found.')
   const headers = new Headers()
   object.writeHttpMetadata(headers)

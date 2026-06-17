@@ -47,6 +47,17 @@ export function validateFile(bytes: Uint8Array, declaredType: string): string {
   return detected
 }
 
+export function requireFileStorage(c: Context<AppEnv>): R2Bucket {
+  if (!c.env.FILES) {
+    throw new HttpError(
+      503,
+      'file_storage_unavailable',
+      'File storage is not configured yet. Enable R2 and bind FILES before using uploads or invoice PDFs.',
+    )
+  }
+  return c.env.FILES
+}
+
 export async function canAccessFile(c: Context<AppEnv>, actor: Actor, fileId: string) {
   const db = drizzle(c.env.DB)
   const [file] = await db
