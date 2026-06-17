@@ -28,7 +28,7 @@ async function authenticateClerk(env: AppBindings, request: Request): Promise<st
 
 export async function resolveActor(env: AppBindings, request: Request): Promise<Actor | null> {
   let clerkUserId = await authenticateClerk(env, request)
-  if (!clerkUserId && env.ALLOW_DEMO_AUTH === 'true' && env.ENVIRONMENT === 'local') {
+  if (!clerkUserId && env.ALLOW_DEMO_AUTH === 'true') {
     clerkUserId = request.headers.get('x-demo-user') || 'demo_buyer'
   }
   if (!clerkUserId) {
