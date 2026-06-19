@@ -4,6 +4,7 @@
 
 - Pages project: `workyard-mvp`
 - Pages domain: `workyard-mvp.pages.dev`
+- Preview branch domain: `preview.workyard-mvp.pages.dev`
 - Preview D1: `workyard-db-preview` (`ea7c8407-3717-408d-8392-e15b4b064e89`)
 - Production D1: `workyard-db-production` (`ee9335f0-7089-4c20-b4ae-bfb079cb2795`)
 - Preview R2: `workyard-files-preview` (blocked until R2 is enabled)
@@ -23,16 +24,17 @@ Do not reuse or modify the existing Invoice Maker Pages project or D1 database.
 
 - `workyard-mvp` Pages project is connected to `tbattulg/Workyard` with Git deployments.
 - Production branch is `main`.
+- Preview Git deployments are restricted to the `preview` branch so public aliases stay neutral.
 - Build command is `npm run build`; output directory is `dist`.
 - Preview and production Pages environments have separate `DB` bindings.
-- Public build variables are set for the neutral display brand and Chicago pilot.
+- Public build variables are set for the neutral display brand, Chicago pilot, and neutral preview branch domain.
 - Root `wrangler.jsonc` vars represent the preview deployment because Pages reads them during Git builds; local browser values should be supplied through `.env` / `.dev.vars`.
 - Pages logging, Sentry, Web Analytics, and uptime checks should be configured outside `wrangler.jsonc`; Pages currently rejects the Workers-only `observability` field during Git builds.
 
 ## Remaining setup
 
-1. Replace placeholder `SUPPORT_EMAIL` / URL values with the launch domain and support inbox.
-2. Enable R2 and bind `FILES` to `workyard-files-preview` and `workyard-files-production`.
+1. Replace placeholder `SUPPORT_EMAIL` and production URL values with the launch domain and support inbox.
+2. Enable R2, create `workyard-files-preview` and `workyard-files-production`, then bind `FILES` in preview and production.
 3. Add the encrypted provider secrets:
    - `CLERK_SECRET_KEY`
    - `CLERK_JWT_KEY`
