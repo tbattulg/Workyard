@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { SignInButton, useAuth } from '@clerk/react'
 import { CheckCircle2, FileUp, Minus, Plus, Send } from 'lucide-react'
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form'
@@ -8,6 +9,7 @@ import { calculateInvoiceTotals, formatMoney } from '../../shared/money'
 import { invoiceSchema, supportRequestSchema } from '../../shared/validation'
 import { Button, Card, Field, SecondaryButton } from '../components/ui'
 import { apiRequest } from '../lib/api'
+import { appConfig } from '../lib/config'
 
 const quoteFormSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -29,8 +31,49 @@ const quoteFormSchema = z.object({
 type QuoteForm = z.infer<typeof quoteFormSchema>
 
 export function QuoteRequestPage() {
+  if (appConfig.clerkPublishableKey) {
+    return <AuthenticatedQuoteRequestPage />
+  }
+  return <QuoteRequestForm />
+}
+
+function AuthenticatedQuoteRequestPage() {
+  const { getToken, isLoaded, isSignedIn } = useAuth()
+
+  if (!isLoaded) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-20">
+        <Card className="p-10 text-center">
+          <h1 className="text-3xl font-black">Loading your session</h1>
+        </Card>
+      </div>
+    )
+  }
+
+  if (!isSignedIn) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-20">
+        <Card className="p-10 text-center">
+          <h1 className="text-3xl font-black">Sign in to request a quote</h1>
+          <p className="mt-3 text-slate-600">
+            Contractor Marketplace uses verified accounts to protect project details.
+          </p>
+          <SignInButton mode="modal">
+            <Button className="mt-6" type="button">
+              Sign in
+            </Button>
+          </SignInButton>
+        </Card>
+      </div>
+    )
+  }
+
+  return <QuoteRequestForm getAuthToken={getToken} />
+}
+
+function QuoteRequestForm({ getAuthToken }: { getAuthToken?: () => Promise<string | null> }) {
   const [params] = useSearchParams()
-  const [sent, setSent] = useState<'live' | 'demo' | false>(false)
+  const [sent, setSent] = useState<'live' | 'demo' | 'failed' | false>(false)
   const companyId = params.get('company') ?? '11111111-1111-4111-8111-111111111111'
   const {
     register,
@@ -56,14 +99,15 @@ export function QuoteRequestPage() {
         preferredStartDate: values.preferredStartDate || undefined,
       }
       try {
+        const authToken = await getAuthToken?.()
         await apiRequest('/quotes', {
           method: 'POST',
           headers: { 'Idempotency-Key': crypto.randomUUID() },
           body: JSON.stringify({ ...payload, ...budget, companyId }),
-        })
+        }, { authToken })
         setSent('live')
       } catch {
-        setSent('demo')
+        setSent(getAuthToken ? 'failed' : 'demo')
       }
     })(event)
   }
@@ -77,7 +121,9 @@ export function QuoteRequestPage() {
           <p className="mt-3 text-slate-600">
             {sent === 'live'
               ? 'The contractor can now review the request in their lead inbox.'
-              : 'In demo mode, no external message was sent. Connect Clerk and D1 to submit live requests.'}
+              : sent === 'demo'
+                ? 'In demo mode, no external message was sent. Connect Clerk and D1 to submit live requests.'
+                : 'We could not submit the request. Please try again or contact support.'}
           </p>
         </Card>
       </div>

@@ -11,12 +11,23 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
+export interface ApiRequestOptions {
+  authToken?: string | null
+  demoUser?: string
+}
+
+export async function apiRequest<T>(
+  path: string,
+  init?: RequestInit,
+  options: ApiRequestOptions = {},
+): Promise<T> {
   const response = await fetch(`/api/v1${path}`, {
     ...init,
     headers: {
       Accept: 'application/json',
       ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(options.authToken ? { Authorization: `Bearer ${options.authToken}` } : {}),
+      ...(options.demoUser ? { 'X-Demo-User': options.demoUser } : {}),
       ...init?.headers,
     },
   })

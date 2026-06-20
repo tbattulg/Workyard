@@ -1,3 +1,4 @@
+import { SignInButton, useAuth } from '@clerk/react'
 import {
   BriefcaseBusiness,
   Building2,
@@ -126,6 +127,48 @@ export function SiteLayout({ children }: { children: ReactNode }) {
 }
 
 export function DashboardLayout({ children }: { children: ReactNode }) {
+  if (appConfig.clerkPublishableKey) {
+    return <AuthenticatedDashboardLayout>{children}</AuthenticatedDashboardLayout>
+  }
+
+  return <DashboardFrame demoMode>{children}</DashboardFrame>
+}
+
+function AuthenticatedDashboardLayout({ children }: { children: ReactNode }) {
+  const { isLoaded, isSignedIn } = useAuth()
+
+  if (!isLoaded) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-slate-100 p-6">
+        <CardLike>
+          <h1 className="text-3xl font-black">Loading your workspace</h1>
+        </CardLike>
+      </div>
+    )
+  }
+
+  if (!isSignedIn) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-slate-100 p-6">
+        <CardLike>
+          <h1 className="text-3xl font-black">Sign in to continue</h1>
+          <p className="mt-3 text-slate-600">
+            Dashboard access requires a verified Contractor Marketplace account.
+          </p>
+          <SignInButton mode="modal">
+            <Button className="mt-6" type="button">
+              Sign in
+            </Button>
+          </SignInButton>
+        </CardLike>
+      </div>
+    )
+  }
+
+  return <DashboardFrame>{children}</DashboardFrame>
+}
+
+function DashboardFrame({ children, demoMode = false }: { children: ReactNode; demoMode?: boolean }) {
   const links = [
     { to: '/dashboard', label: 'Overview', icon: BriefcaseBusiness },
     { to: '/dashboard/leads', label: 'Leads', icon: Search },
@@ -157,11 +200,21 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
           ))}
         </nav>
         <div className="mt-8 rounded-xl border border-slate-700 bg-slate-900 p-4 text-sm">
-          <p className="font-bold text-white">Demo workspace</p>
-          <p className="mt-1 text-slate-400">Connect Clerk to use real accounts.</p>
+          <p className="font-bold text-white">{demoMode ? 'Demo workspace' : 'Live workspace'}</p>
+          <p className="mt-1 text-slate-400">
+            {demoMode ? 'Connect Clerk to use real accounts.' : 'Signed in with Clerk.'}
+          </p>
         </div>
       </aside>
       <div>{children}</div>
+    </div>
+  )
+}
+
+function CardLike({ children }: { children: ReactNode }) {
+  return (
+    <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-10 text-center shadow-sm">
+      {children}
     </div>
   )
 }

@@ -33,6 +33,28 @@ describe('apiRequest', () => {
     })
   })
 
+  it('adds auth and demo headers only when requested', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ data: { ok: true }, meta: { requestId: 'req_1' } }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
+
+    await apiRequest('/quotes', { method: 'POST', body: JSON.stringify({ ok: true }) }, {
+      authToken: 'session-token',
+      demoUser: 'demo_admin',
+    })
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+
+    expect(url).toBe('/api/v1/quotes')
+    expect(init.headers).toMatchObject({
+      Authorization: 'Bearer session-token',
+      'X-Demo-User': 'demo_admin',
+    })
+  })
+
   it('handles non-json development fallbacks as API errors', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response('<!doctype html>', { status: 404, headers: { 'content-type': 'text/html' } }),

@@ -26,10 +26,24 @@ async function authenticateClerk(env: AppBindings, request: Request): Promise<st
   return state.toAuth().userId
 }
 
+export function isDemoAuthEnabled(env: Pick<AppBindings, 'ALLOW_DEMO_AUTH' | 'ENVIRONMENT'>) {
+  return env.ALLOW_DEMO_AUTH === 'true' && env.ENVIRONMENT !== 'production'
+}
+
+export function getDemoClerkUserId(
+  env: Pick<AppBindings, 'ALLOW_DEMO_AUTH' | 'ENVIRONMENT'>,
+  request: Request,
+) {
+  if (!isDemoAuthEnabled(env)) {
+    return null
+  }
+  return request.headers.get('x-demo-user') || 'demo_buyer'
+}
+
 export async function resolveActor(env: AppBindings, request: Request): Promise<Actor | null> {
   let clerkUserId = await authenticateClerk(env, request)
-  if (!clerkUserId && env.ALLOW_DEMO_AUTH === 'true') {
-    clerkUserId = request.headers.get('x-demo-user') || 'demo_buyer'
+  if (!clerkUserId) {
+    clerkUserId = getDemoClerkUserId(env, request)
   }
   if (!clerkUserId) {
     return null
