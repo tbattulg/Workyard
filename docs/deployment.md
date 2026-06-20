@@ -17,7 +17,7 @@ Do not reuse or modify the existing Invoice Maker Pages project or D1 database.
 1. Enable R2 in the Cloudflare dashboard.
 2. Create the preview and production R2 buckets.
 3. Bind `FILES` separately in preview and production.
-4. Add Clerk, Resend, Mapbox, Sentry, and Turnstile values as encrypted secrets.
+4. Add Clerk, Clerk webhook signing, Resend, Mapbox, Sentry, and Turnstile values as encrypted secrets.
 5. Add `VITE_CLERK_PUBLISHABLE_KEY`, `CLERK_PUBLISHABLE_KEY`, `VITE_MAPBOX_PUBLIC_TOKEN`, and `SUPPORT_EMAIL` as plain deployment variables when real values are available.
 6. Apply migrations to preview, verify the preview deployment, then apply to production.
 

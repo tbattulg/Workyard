@@ -5,6 +5,7 @@ export type AppBindings = Omit<Env, 'FILES'> & {
   CLERK_SECRET_KEY?: string
   CLERK_PUBLISHABLE_KEY?: string
   CLERK_JWT_KEY?: string
+  CLERK_WEBHOOK_SIGNING_SECRET?: string
   RESEND_API_KEY?: string
   MAPBOX_SECRET_TOKEN?: string
   SENTRY_DSN?: string

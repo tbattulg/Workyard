@@ -56,6 +56,7 @@ import {
   canTransitionJob,
   canTransitionProposal,
 } from '../../shared/transitions'
+import { verifyWebhook } from '@clerk/backend/webhooks'
 import {
   requireActor,
   requireCompanyMember,
@@ -65,6 +66,12 @@ import {
   resolveActor,
 } from './lib/auth'
 import { writeAudit } from './lib/audit'
+import {
+  applyClerkUserSyncAction,
+  buildClerkUserSyncAction,
+  ClerkUserSyncError,
+  type ClerkUserSyncAction,
+} from './lib/clerk-sync'
 import { canAccessFile, MAX_UPLOAD_BYTES, requireFileStorage, validateFile } from './lib/files'
 import { handleError, HttpError, ok, validationFields } from './lib/http'
 import { executeIdempotently } from './lib/idempotency'
@@ -104,6 +111,47 @@ app.notFound((c) =>
 app.get('/health', (c) =>
   ok(c, { status: 'ok', environment: c.env.ENVIRONMENT, timestamp: new Date().toISOString() }),
 )
+
+app.post('/webhooks/clerk', async (c) => {
+  if (!c.env.CLERK_WEBHOOK_SIGNING_SECRET) {
+    throw new HttpError(
+      503,
+      'clerk_webhook_not_configured',
+      'Clerk webhook signing is not configured.',
+    )
+  }
+
+  let event: Awaited<ReturnType<typeof verifyWebhook>>
+  try {
+    event = await verifyWebhook(c.req.raw, {
+      signingSecret: c.env.CLERK_WEBHOOK_SIGNING_SECRET,
+    })
+  } catch {
+    throw new HttpError(401, 'invalid_clerk_webhook', 'Clerk webhook verification failed.')
+  }
+
+  let action: ClerkUserSyncAction
+  try {
+    action = buildClerkUserSyncAction(event)
+  } catch (error) {
+    if (error instanceof ClerkUserSyncError) {
+      throw new HttpError(422, error.code, error.message)
+    }
+    throw error
+  }
+
+  const result = await applyClerkUserSyncAction(c.env.DB, action)
+  await writeAudit(c, {
+    action: `clerk_user.${result.action}`,
+    targetType: 'user',
+    targetId: 'userId' in result ? result.userId : undefined,
+    details: {
+      clerkUserId: 'clerkUserId' in result ? (result.clerkUserId ?? null) : null,
+      eventType: event.type,
+    },
+  })
+  return ok(c, result)
+})
 
 const companyInputSchema = z.object({
   name: z.string().trim().min(2).max(160),
