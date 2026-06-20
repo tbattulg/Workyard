@@ -1,8 +1,8 @@
-# Workyard MVP
+# Contractor Marketplace
 
 Workyard is the internal codename for a Chicago-first construction services marketplace. The public brand is configured with `VITE_PUBLIC_APP_NAME` and must remain neutral until trademark review is complete.
 
-The MVP connects buyers with manually verified trade businesses, carries a project from quote request through proposal and job tracking, and produces itemized post-work invoices. It does not process payments.
+Contractor Marketplace connects buyers with manually verified trade businesses, carries a project from quote request through proposal and job tracking, and produces itemized post-work invoices. It does not process payments.
 
 ## Stack
 
