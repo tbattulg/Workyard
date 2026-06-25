@@ -41,3 +41,38 @@ test('quote form validates and completes in demo fallback mode', async ({ page }
   })
   await expect(page.getByRole('heading', { name: /your request is ready/i })).toBeVisible()
 })
+
+test('operator workflow surfaces cover leads jobs invoices and admin verification', async ({
+  page,
+}) => {
+  await page.goto('/dashboard/company')
+  await expect(page.getByRole('heading', { name: /company command center/i })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /lead inbox/i })).toBeVisible()
+  await expect(page.getByText(/200a panel upgrade/i)).toBeVisible()
+  await expect(page.getByText(/proposal sent/i).first()).toBeVisible()
+
+  await page.goto('/dashboard/leads')
+  await expect(page.getByRole('heading', { name: /^lead inbox$/i })).toBeVisible()
+  await expect(page.getByText(/review project details/i)).toBeVisible()
+  await expect(page.getByText(/proposal sent - oak park/i)).toBeVisible()
+
+  await page.goto('/dashboard/jobs')
+  await expect(page.getByRole('heading', { name: /^jobs$/i })).toBeVisible()
+  await expect(page.getByText(/awaiting invoice/i)).toBeVisible()
+
+  await page.goto('/dashboard/invoices')
+  await expect(page.getByRole('heading', { name: /^invoices$/i })).toBeVisible()
+  await expect(page.getByText(/sent/i).first()).toBeVisible()
+  await expect(page.getByText(/paid jun 10/i)).toBeVisible()
+  await page.getByRole('link', { name: /new invoice/i }).click()
+  await expect(page.getByRole('heading', { name: /build invoice/i })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /invoice summary/i })).toBeVisible()
+  await expect(page.getByText(/once sent, this invoice becomes immutable/i)).toBeVisible()
+  await expect(page.getByRole('button', { name: /preview pdf/i })).toBeVisible()
+
+  await page.goto('/admin')
+  await expect(page.getByRole('heading', { name: /trust and safety/i })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /pending companies/i })).toBeVisible()
+  await expect(page.getByText(/chicago masonry group/i)).toBeVisible()
+  await expect(page.getByRole('button', { name: /approve/i }).first()).toBeVisible()
+})
