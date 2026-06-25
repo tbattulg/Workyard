@@ -72,6 +72,7 @@ import {
   ClerkUserSyncError,
   type ClerkUserSyncAction,
 } from './lib/clerk-sync'
+import { sendInvoiceEmail } from './lib/email'
 import { canAccessFile, MAX_UPLOAD_BYTES, requireFileStorage, validateFile } from './lib/files'
 import { handleError, HttpError, ok, validationFields } from './lib/http'
 import { executeIdempotently } from './lib/idempotency'
@@ -1756,6 +1757,7 @@ app.post('/invoices/:id/send', async (c) => {
       byte.toString(16).padStart(2, '0'),
     ).join('')
     const now = new Date().toISOString()
+    const emailDeliveryId = crypto.randomUUID()
     await db.batch([
       db.insert(files).values({
         id: fileId,
@@ -1802,12 +1804,11 @@ app.post('/invoices/:id/send', async (c) => {
         createdAt: now,
       }),
       db.insert(emailDeliveries).values({
-        id: crypto.randomUUID(),
+        id: emailDeliveryId,
         userId: buyer.id,
         template: 'invoice_sent',
         recipientHash: buyer.id,
-        status: c.env.RESEND_API_KEY ? 'queued' : 'failed',
-        lastErrorCode: c.env.RESEND_API_KEY ? null : 'provider_not_configured',
+        status: 'queued',
         createdAt: now,
         updatedAt: now,
       }),
@@ -1818,6 +1819,35 @@ app.post('/invoices/:id/send', async (c) => {
       targetId: invoice.id,
       companyId: invoice.companyId,
     })
+    const emailResult = await sendInvoiceEmail(c.env, {
+      buyerEmail: buyer.email,
+      buyerName: buyer.name,
+      companyName: company.name,
+      invoiceId: invoice.id,
+      invoiceNumber: invoice.invoiceNumber,
+      totalCents: invoice.totalCents,
+    })
+    try {
+      await db
+        .update(emailDeliveries)
+        .set({
+          status: emailResult.status,
+          providerMessageId: emailResult.providerMessageId,
+          lastErrorCode: emailResult.lastErrorCode,
+          attempts: 1,
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(emailDeliveries.id, emailDeliveryId))
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          message: 'email delivery status update failed',
+          requestId: c.get('requestId'),
+          deliveryId: emailDeliveryId,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      )
+    }
     return { id: invoice.id, status: 'sent' as const, pdfFileId: fileId }
   })
   return ok(c, result.value)
