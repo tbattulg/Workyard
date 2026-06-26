@@ -14,7 +14,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import type { CompanySummary } from '../../shared/domain'
 import { US_STATES, stateNameForCode } from '../../shared/us-states'
-import { demoCompanies } from '../data/demo'
+import { demoCompanies, demoServicesBySlug } from '../data/demo'
 import { apiRequest } from '../lib/api'
 import { Badge, Button, Card, SecondaryButton } from '../components/ui'
 
@@ -317,12 +317,10 @@ export function CompanyPage() {
     retry: false,
   })
   const company = companyQuery.data ?? fallbackCompany
-  const services = companyQuery.data?.services?.map((service) => service.title) ?? [
-    'Panel upgrades and replacements',
-    'Lighting installation',
-    'Troubleshooting and repairs',
-    'Commercial maintenance',
-  ]
+  const services =
+    companyQuery.data?.services?.map((service) => service.title) ??
+    demoServicesBySlug[fallbackCompany.slug] ??
+    []
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
       <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
