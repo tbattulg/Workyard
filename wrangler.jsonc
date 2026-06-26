@@ -1,0 +1,48 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "contractor-marketplace",
+  "pages_build_output_dir": "./dist",
+  "compatibility_date": "2026-06-17",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "ENVIRONMENT": "preview",
+    "PUBLIC_APP_NAME": "Contractor Marketplace",
+    "PUBLIC_APP_URL": "https://preview.contractor-marketplace.pages.dev",
+    "VITE_PUBLIC_APP_NAME": "Contractor Marketplace",
+    "VITE_PUBLIC_APP_URL": "https://preview.contractor-marketplace.pages.dev",
+    "PILOT_MARKET": "Chicago, IL",
+    "ALLOW_DEMO_AUTH": "true",
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "workyard-db-preview",
+      "database_id": "ea7c8407-3717-408d-8392-e15b4b064e89",
+      "migrations_dir": "./migrations",
+    },
+  ],
+  // R2 is not enabled in the Cloudflare account yet. After it is enabled,
+  // create workyard-files-preview and workyard-files-production, then bind
+  // FILES in the Pages preview and production deployment settings.
+  "env": {
+    "production": {
+      "vars": {
+        "ENVIRONMENT": "production",
+        "PUBLIC_APP_NAME": "Contractor Marketplace",
+        "PUBLIC_APP_URL": "https://contractor-marketplace.pages.dev",
+        "VITE_PUBLIC_APP_NAME": "Contractor Marketplace",
+        "VITE_PUBLIC_APP_URL": "https://contractor-marketplace.pages.dev",
+        "PILOT_MARKET": "Chicago, IL",
+        "ALLOW_DEMO_AUTH": "false",
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "workyard-db-production",
+          "database_id": "ee9335f0-7089-4c20-b4ae-bfb079cb2795",
+          "migrations_dir": "./migrations",
+        },
+      ],
+    },
+  },
+}
