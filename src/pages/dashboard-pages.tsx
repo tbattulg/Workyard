@@ -31,6 +31,18 @@ type ServiceStatesResponse = {
   status?: string
 }
 
+type CompanyMembership = {
+  companyId: string
+  companyName: string
+  role: 'company_admin' | 'staff'
+  companyStatus: string
+}
+
+type MeResponse = {
+  id: string
+  memberships: CompanyMembership[]
+}
+
 export function DashboardPage() {
   return (
     <DashboardShell
@@ -218,35 +230,81 @@ function CompanyServiceStatesPanel() {
     return <AuthenticatedCompanyServiceStatesPanel />
   }
 
-  return <ServiceStatesPanel demoUser="demo_contractor" />
+  return (
+    <ServiceStatesPanel
+      companyId={DEMO_COMPANY_ID}
+      companyName="Lakefront Electric Co."
+      demoUser="demo_contractor"
+    />
+  )
 }
 
 function AuthenticatedCompanyServiceStatesPanel() {
   const { getToken, isLoaded } = useAuth()
-  return <ServiceStatesPanel enabled={isLoaded} getToken={getToken} />
+  const authOptions = async () => ({
+    authToken: await getToken(),
+  })
+  const meQuery = useQuery({
+    queryKey: ['me'],
+    enabled: isLoaded,
+    queryFn: async () => apiRequest<MeResponse>('/me', undefined, await authOptions()),
+    retry: false,
+  })
+  const companyMembership =
+    meQuery.data?.memberships.find((membership) => membership.role === 'company_admin') ?? null
+  const errorMessage =
+    meQuery.error instanceof ApiError
+      ? meQuery.error.message
+      : meQuery.error
+        ? 'Your workspace could not be loaded.'
+        : null
+
+  if (!isLoaded || meQuery.isLoading) {
+    return <ServiceStatesStatusCard message="Loading service states." />
+  }
+
+  if (errorMessage) {
+    return <ServiceStatesStatusCard message={errorMessage} tone="error" />
+  }
+
+  if (!companyMembership) {
+    return <ServiceStatesStatusCard message="Company admin access is required." tone="error" />
+  }
+
+  return (
+    <ServiceStatesPanel
+      companyId={companyMembership.companyId}
+      companyName={companyMembership.companyName}
+      getToken={getToken}
+    />
+  )
 }
 
 function ServiceStatesPanel({
+  companyId,
+  companyName = 'this company',
   demoUser,
   enabled = true,
   getToken,
 }: {
+  companyId: string
+  companyName?: string
   demoUser?: string
   enabled?: boolean
   getToken?: () => Promise<string | null>
 }) {
   const queryClient = useQueryClient()
-  const [draftStates, setDraftStates] = useState<string[] | null>(null)
+  const [draft, setDraft] = useState<{ companyId: string; states: string[] } | null>(null)
   const authOptions = async () => ({
     authToken: getToken ? await getToken() : null,
     demoUser,
   })
   const serviceStatesQuery = useQuery({
-    queryKey: ['company-service-states', DEMO_COMPANY_ID],
+    queryKey: ['company-service-states', companyId],
     enabled,
     queryFn: async () =>
       apiRequest<ServiceStatesResponse>(
-        `/companies/${DEMO_COMPANY_ID}/service-states`,
+        `/companies/${companyId}/service-states`,
         undefined,
         await authOptions(),
       ),
@@ -255,7 +313,7 @@ function ServiceStatesPanel({
   const mutation = useMutation({
     mutationFn: async (states: string[]) =>
       apiRequest<ServiceStatesResponse>(
-        `/companies/${DEMO_COMPANY_ID}/service-states`,
+        `/companies/${companyId}/service-states`,
         {
           method: 'PUT',
           body: JSON.stringify({ states }),
@@ -263,18 +321,20 @@ function ServiceStatesPanel({
         await authOptions(),
       ),
     onSuccess: (data) => {
-      setDraftStates(data.states)
-      queryClient.setQueryData(['company-service-states', DEMO_COMPANY_ID], data)
+      setDraft({ companyId, states: data.states })
+      queryClient.setQueryData(['company-service-states', companyId], data)
     },
   })
 
-  const selectedStates = draftStates ?? serviceStatesQuery.data?.states ?? []
+  const selectedStates =
+    draft?.companyId === companyId ? draft.states : (serviceStatesQuery.data?.states ?? [])
   const toggleState = (code: string) => {
-    setDraftStates((current) => {
-      const source = current ?? selectedStates
-      return source.includes(code)
+    setDraft((current) => {
+      const source = current?.companyId === companyId ? current.states : selectedStates
+      const states = source.includes(code)
         ? source.filter((state) => state !== code)
         : [...source, code].sort()
+      return { companyId, states }
     })
   }
   const error = mutation.error ?? serviceStatesQuery.error
@@ -289,7 +349,7 @@ function ServiceStatesPanel({
             <MapPin size={20} /> Service states
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Select every state where leads are accepted.
+            Select every state where {companyName} accepts leads.
           </p>
         </div>
         <Button
@@ -340,6 +400,27 @@ function ServiceStatesPanel({
           </p>
         ) : null}
       </div>
+    </Card>
+  )
+}
+
+function ServiceStatesStatusCard({
+  message,
+  tone = 'neutral',
+}: {
+  message: string
+  tone?: 'neutral' | 'error'
+}) {
+  return (
+    <Card className="mt-7 p-5">
+      <h2 className="flex items-center gap-2 text-xl font-black">
+        <MapPin size={20} /> Service states
+      </h2>
+      <p
+        className={`mt-3 text-sm font-semibold ${tone === 'error' ? 'text-red-700' : 'text-slate-600'}`}
+      >
+        {message}
+      </p>
     </Card>
   )
 }
