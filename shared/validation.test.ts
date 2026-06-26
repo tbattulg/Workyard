@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { invoiceSchema, quoteRequestSchema } from './validation'
+import { invoiceSchema, quoteRequestSchema, serviceStatesSchema } from './validation'
 
 const companyId = '11111111-1111-4111-8111-111111111111'
 const jobId = '44444444-4444-4444-8444-444444444444'
@@ -35,6 +35,34 @@ describe('quote request validation', () => {
       budgetMaxCents: 100_000,
     })
     expect(result.success).toBe(false)
+  })
+
+  it('rejects unknown state codes', () => {
+    const result = quoteRequestSchema.safeParse({
+      companyId,
+      name: 'Jordan Lee',
+      email: 'jordan@example.com',
+      phone: '312-555-0199',
+      projectAddress: '1234 W Grand Ave',
+      projectCity: 'Chicago',
+      projectState: 'ZZ',
+      projectZip: '60642',
+      jobDescription: 'Replace the electrical panel and inspect the service entrance.',
+    })
+    expect(result.success).toBe(false)
+  })
+})
+
+describe('service state validation', () => {
+  it('normalizes and deduplicates service states', () => {
+    const result = serviceStatesSchema.parse({ states: ['il', 'IN', 'IL'] })
+
+    expect(result.states).toEqual(['IL', 'IN'])
+  })
+
+  it('requires at least one valid state code', () => {
+    expect(serviceStatesSchema.safeParse({ states: [] }).success).toBe(false)
+    expect(serviceStatesSchema.safeParse({ states: ['IL', 'ZZ'] }).success).toBe(false)
   })
 })
 

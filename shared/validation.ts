@@ -1,6 +1,22 @@
 import { z } from 'zod'
+import { isUsStateCode } from './us-states'
 
 export const uuidSchema = z.string().uuid()
+
+export const stateCodeSchema = z
+  .string()
+  .trim()
+  .length(2)
+  .transform((value) => value.toUpperCase())
+  .refine(isUsStateCode, 'Use a valid U.S. state code.')
+
+export const serviceStatesSchema = z.object({
+  states: z
+    .array(stateCodeSchema)
+    .min(1)
+    .max(50)
+    .transform((states) => [...new Set(states)]),
+})
 
 export const cursorQuerySchema = z.object({
   cursor: z.string().min(1).max(256).optional(),
@@ -10,7 +26,8 @@ export const cursorQuerySchema = z.object({
 export const companySearchSchema = cursorQuerySchema.extend({
   q: z.string().trim().max(120).optional(),
   category: z.string().trim().max(80).optional(),
-  city: z.string().trim().max(80).default('Chicago'),
+  city: z.string().trim().max(80).optional(),
+  state: stateCodeSchema.optional(),
   zip: z
     .string()
     .regex(/^\d{5}$/)
@@ -26,11 +43,7 @@ export const quoteRequestSchema = z
     phone: z.string().trim().min(7).max(30),
     projectAddress: z.string().trim().min(5).max(200),
     projectCity: z.string().trim().min(2).max(80),
-    projectState: z
-      .string()
-      .trim()
-      .length(2)
-      .transform((value) => value.toUpperCase()),
+    projectState: stateCodeSchema,
     projectZip: z.string().regex(/^\d{5}$/),
     jobDescription: z.string().trim().min(20).max(5000),
     preferredStartDate: z.string().date().optional(),

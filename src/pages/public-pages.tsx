@@ -13,6 +13,7 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import type { CompanySummary } from '../../shared/domain'
+import { US_STATES, stateNameForCode } from '../../shared/us-states'
 import { demoCompanies } from '../data/demo'
 import { apiRequest } from '../lib/api'
 import { Badge, Button, Card, SecondaryButton } from '../components/ui'
@@ -147,26 +148,29 @@ export function HomePage() {
 
 export function BrowsePage() {
   const [params, setParams] = useSearchParams()
-  const query = params.get('q')?.toLowerCase() ?? ''
+  const query = params.get('q') ?? ''
   const category = params.get('category') ?? ''
+  const state = params.get('state') ?? ''
   const filteredDemo = demoCompanies.filter(
     (company) =>
       (!query ||
         `${company.name} ${company.description} ${company.categories.join(' ')}`
           .toLowerCase()
-          .includes(query)) &&
-      (!category || company.categories.includes(category)),
+          .includes(query.toLowerCase())) &&
+      (!category || company.categories.includes(category)) &&
+      (!state || (company.serviceStates ?? [company.state]).includes(state)),
   )
   const search = new URLSearchParams()
   if (query) search.set('q', query)
   if (category) search.set('category', category)
-  search.set('city', 'Chicago')
+  if (state) search.set('state', state)
   const companiesQuery = useQuery({
-    queryKey: ['companies', query, category],
+    queryKey: ['companies', query, category, state],
     queryFn: () => apiRequest<CompanySummary[]>(`/companies?${search.toString()}`),
     retry: false,
   })
   const filtered = companiesQuery.data ?? filteredDemo
+  const emptyLocation = state ? stateNameForCode(state) : 'those filters'
   return (
     <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
       <div className="max-w-3xl">
@@ -177,16 +181,19 @@ export function BrowsePage() {
         </p>
       </div>
       <form
-        className="mt-8 grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-[1fr_220px_auto]"
+        className="mt-8 grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-[1fr_190px_180px_auto]"
         onSubmit={(event) => {
           event.preventDefault()
           const form = new FormData(event.currentTarget)
           const q = form.get('q')
           const selectedCategory = form.get('category')
-          setParams({
-            q: typeof q === 'string' ? q : '',
-            category: typeof selectedCategory === 'string' ? selectedCategory : '',
-          })
+          const selectedState = form.get('state')
+          const next = new URLSearchParams()
+          if (typeof q === 'string' && q) next.set('q', q)
+          if (typeof selectedCategory === 'string' && selectedCategory)
+            next.set('category', selectedCategory)
+          if (typeof selectedState === 'string' && selectedState) next.set('state', selectedState)
+          setParams(next)
         }}
       >
         <input
@@ -207,24 +214,42 @@ export function BrowsePage() {
             <option key={item}>{item}</option>
           ))}
         </select>
+        <select
+          name="state"
+          defaultValue={state}
+          className="min-h-12 rounded-lg border border-slate-300 px-4"
+          aria-label="Filter by state"
+        >
+          <option value="">All states</option>
+          {US_STATES.map((item) => (
+            <option key={item.code} value={item.code}>
+              {item.name}
+            </option>
+          ))}
+        </select>
         <Button type="submit">Search</Button>
       </form>
-      <div className="mt-8 grid gap-6 lg:grid-cols-3">
-        {filtered.map((company) => (
-          <CompanyCard key={company.id} company={company} />
-        ))}
-      </div>
+      {companiesQuery.isLoading ? (
+        <Card className="mt-8 p-8 text-center">
+          <h2 className="text-xl font-black">Loading contractors</h2>
+          <p className="mt-2 text-slate-600">Checking current service states.</p>
+        </Card>
+      ) : (
+        <div className="mt-8 grid gap-6 lg:grid-cols-3">
+          {filtered.map((company) => (
+            <CompanyCard key={company.id} company={company} />
+          ))}
+        </div>
+      )}
       {companiesQuery.isError ? (
-        <p className="mt-4 text-sm text-slate-500">
+        <p className="mt-4 text-sm text-slate-500" role="alert">
           Showing demo companies until the Cloudflare API is connected locally.
         </p>
       ) : null}
-      {filtered.length === 0 ? (
+      {!companiesQuery.isLoading && filtered.length === 0 ? (
         <Card className="mt-8 p-10 text-center">
           <h2 className="text-xl font-black">No exact matches yet</h2>
-          <p className="mt-2 text-slate-600">
-            Try another service or browse all Chicago contractors.
-          </p>
+          <p className="mt-2 text-slate-600">Try another service or state near {emptyLocation}.</p>
           <SecondaryButton className="mt-5" onClick={() => setParams({})}>
             Clear filters
           </SecondaryButton>

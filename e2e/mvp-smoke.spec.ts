@@ -23,6 +23,16 @@ test('buyer can browse a contractor and open the quote form', async ({ page }) =
   ).toBeVisible()
 })
 
+test('buyer can filter marketplace results by service state', async ({ page }) => {
+  await page.goto('/browse')
+  await page.getByLabel('Filter by state').selectOption('IN')
+  await page.getByRole('button', { name: /^search$/i }).click()
+
+  await expect(page).toHaveURL(/state=IN/)
+  await expect(page.getByRole('heading', { name: /lakefront electric/i })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /prairie & stone/i })).toHaveCount(0)
+})
+
 test('quote form validates and completes in demo fallback mode', async ({ page }) => {
   await page.goto('/request-quote?company=11111111-1111-4111-8111-111111111111')
   await page.getByLabel('Name').fill('Jordan Lee')

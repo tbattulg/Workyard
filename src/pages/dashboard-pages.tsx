@@ -2,18 +2,34 @@ import {
   ArrowUpRight,
   CalendarDays,
   Clock3,
+  LoaderCircle,
+  MapPin,
   MessageSquareText,
   MoreHorizontal,
   Plus,
+  Save,
   Search,
   ShieldAlert,
   Star,
 } from 'lucide-react'
+import { useAuth } from '@clerk/react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { activity, buyerMetrics, companyMetrics } from '../data/demo'
 import { formatMoney } from '../../shared/money'
+import { US_STATES } from '../../shared/us-states'
+import { apiRequest, ApiError } from '../lib/api'
+import { appConfig } from '../lib/config'
 import { Badge, Button, Card, SecondaryButton } from '../components/ui'
+
+const DEMO_COMPANY_ID = '11111111-1111-4111-8111-111111111111'
+
+type ServiceStatesResponse = {
+  id?: string
+  states: string[]
+  status?: string
+}
 
 export function DashboardPage() {
   return (
@@ -115,6 +131,7 @@ export function CompanyDashboardPage() {
           </Card>
         ))}
       </div>
+      <CompanyServiceStatesPanel />
       <Card className="mt-7 overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 p-5">
           <div>
@@ -193,6 +210,137 @@ export function CompanyDashboardPage() {
         </div>
       </Card>
     </DashboardShell>
+  )
+}
+
+function CompanyServiceStatesPanel() {
+  if (appConfig.clerkPublishableKey) {
+    return <AuthenticatedCompanyServiceStatesPanel />
+  }
+
+  return <ServiceStatesPanel demoUser="demo_contractor" />
+}
+
+function AuthenticatedCompanyServiceStatesPanel() {
+  const { getToken, isLoaded } = useAuth()
+  return <ServiceStatesPanel enabled={isLoaded} getToken={getToken} />
+}
+
+function ServiceStatesPanel({
+  demoUser,
+  enabled = true,
+  getToken,
+}: {
+  demoUser?: string
+  enabled?: boolean
+  getToken?: () => Promise<string | null>
+}) {
+  const queryClient = useQueryClient()
+  const [draftStates, setDraftStates] = useState<string[] | null>(null)
+  const authOptions = async () => ({
+    authToken: getToken ? await getToken() : null,
+    demoUser,
+  })
+  const serviceStatesQuery = useQuery({
+    queryKey: ['company-service-states', DEMO_COMPANY_ID],
+    enabled,
+    queryFn: async () =>
+      apiRequest<ServiceStatesResponse>(
+        `/companies/${DEMO_COMPANY_ID}/service-states`,
+        undefined,
+        await authOptions(),
+      ),
+    retry: false,
+  })
+  const mutation = useMutation({
+    mutationFn: async (states: string[]) =>
+      apiRequest<ServiceStatesResponse>(
+        `/companies/${DEMO_COMPANY_ID}/service-states`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ states }),
+        },
+        await authOptions(),
+      ),
+    onSuccess: (data) => {
+      setDraftStates(data.states)
+      queryClient.setQueryData(['company-service-states', DEMO_COMPANY_ID], data)
+    },
+  })
+
+  const selectedStates = draftStates ?? serviceStatesQuery.data?.states ?? []
+  const toggleState = (code: string) => {
+    setDraftStates((current) => {
+      const source = current ?? selectedStates
+      return source.includes(code)
+        ? source.filter((state) => state !== code)
+        : [...source, code].sort()
+    })
+  }
+  const error = mutation.error ?? serviceStatesQuery.error
+  const errorMessage =
+    error instanceof ApiError ? error.message : error ? 'Service states could not be loaded.' : null
+
+  return (
+    <Card className="mt-7 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 className="flex items-center gap-2 text-xl font-black">
+            <MapPin size={20} /> Service states
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Select every state where leads are accepted.
+          </p>
+        </div>
+        <Button
+          className="gap-2"
+          disabled={selectedStates.length === 0 || mutation.isPending}
+          onClick={() => mutation.mutate(selectedStates)}
+        >
+          {mutation.isPending ? (
+            <LoaderCircle className="animate-spin" size={17} />
+          ) : (
+            <Save size={17} />
+          )}
+          Save states
+        </Button>
+      </div>
+      {serviceStatesQuery.isLoading ? (
+        <p className="mt-5 text-sm text-slate-600">Loading service states.</p>
+      ) : (
+        <fieldset className="mt-5">
+          <legend className="sr-only">Service states</legend>
+          <div className="grid max-h-72 gap-2 overflow-y-auto rounded-lg border border-slate-200 p-3 sm:grid-cols-2 xl:grid-cols-4">
+            {US_STATES.map((state) => (
+              <label
+                key={state.code}
+                className="flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                <input
+                  type="checkbox"
+                  className="size-4 rounded border-slate-300 accent-amber-500"
+                  checked={selectedStates.includes(state.code)}
+                  onChange={() => toggleState(state.code)}
+                />
+                <span>
+                  {state.name} ({state.code})
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
+      <div className="mt-4 min-h-5 text-sm">
+        {mutation.isSuccess ? (
+          <p className="font-semibold text-emerald-700">Service states saved.</p>
+        ) : null}
+        {errorMessage ? (
+          <p className="font-semibold text-red-700" role="alert">
+            {errorMessage}
+          </p>
+        ) : null}
+      </div>
+    </Card>
   )
 }
 

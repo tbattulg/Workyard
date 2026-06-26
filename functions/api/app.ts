@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, like, or, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNull, like, notInArray, or, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { Hono } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
@@ -48,6 +48,8 @@ import {
   proposalSchema,
   quoteRequestSchema,
   reviewSchema,
+  serviceStatesSchema,
+  stateCodeSchema,
   supportRequestSchema,
   uuidSchema,
 } from '../../shared/validation'
@@ -163,14 +165,12 @@ const companyInputSchema = z.object({
   email: z.string().trim().email().max(254),
   addressLine1: z.string().trim().max(200).optional(),
   city: z.string().trim().min(2).max(80),
-  state: z
-    .string()
-    .trim()
-    .length(2)
-    .transform((value) => value.toUpperCase()),
+  state: stateCodeSchema,
   zip: z.string().regex(/^\d{5}$/),
   serviceRadiusMiles: z.number().int().min(1).max(150).default(25),
 })
+
+const STATEWIDE_SERVICE_AREA_CITY = 'Statewide'
 
 const serviceInputSchema = z.object({
   companyId: uuidSchema,
@@ -203,7 +203,7 @@ app.get('/companies', async (c) => {
       'Review the search filters.',
       validationFields(parsed.error),
     )
-  const { q, category, city, zip, limit } = parsed.data
+  const { q, category, city, state, zip, limit } = parsed.data
   const db = drizzle(c.env.DB)
   const conditions = [eq(companies.status, 'verified'), isNull(companies.deletedAt)]
   if (city) {
@@ -213,6 +213,9 @@ app.get('/companies', async (c) => {
   if (zip) {
     const zipCondition = or(eq(companies.zip, zip), eq(companyServiceAreas.zip, zip))
     if (zipCondition) conditions.push(zipCondition)
+  }
+  if (state) {
+    conditions.push(eq(companyServiceAreas.state, state))
   }
   if (category)
     conditions.push(eq(serviceCategories.slug, category.toLowerCase().replaceAll(' ', '-')))
@@ -235,6 +238,7 @@ app.get('/companies', async (c) => {
       state: companies.state,
       serviceRadiusMiles: companies.serviceRadiusMiles,
       licenseNumber: companies.licenseNumber,
+      serviceState: companyServiceAreas.state,
       category: serviceCategories.name,
       rating: sql<number>`coalesce(avg(${reviews.rating}), 0)`,
       reviewCount: sql<number>`count(distinct ${reviews.id})`,
@@ -249,8 +253,9 @@ app.get('/companies', async (c) => {
     .orderBy(desc(sql`avg(${reviews.rating})`), companies.name)
     .limit(limit * 8)
 
+  const filteredRows = state ? rows.filter((row) => row.serviceState === state) : rows
   const byCompany = new Map<string, CompanySummary>()
-  for (const row of rows) {
+  for (const row of filteredRows) {
     const existing = byCompany.get(row.id)
     if (existing) {
       if (row.category && !existing.categories.includes(row.category))
@@ -438,6 +443,80 @@ app.patch('/companies/:id', async (c) => {
     details: { actorId: actor.id, requiresReview: company.status === 'verified' },
   })
   return ok(c, { id: companyId, status })
+})
+
+app.get('/companies/:id/service-states', async (c) => {
+  const companyId = uuidSchema.parse(c.req.param('id'))
+  await requireCompanyMember(c, companyId, ['company_admin'])
+  const db = drizzle(c.env.DB)
+  const rows = await db
+    .select({ state: companyServiceAreas.state })
+    .from(companyServiceAreas)
+    .where(eq(companyServiceAreas.companyId, companyId))
+    .orderBy(companyServiceAreas.state)
+  const states = [...new Set(rows.map((row) => row.state))].filter(
+    (state) => stateCodeSchema.safeParse(state).success,
+  )
+  return ok(c, { states })
+})
+
+app.put('/companies/:id/service-states', async (c) => {
+  const companyId = uuidSchema.parse(c.req.param('id'))
+  const { actor } = await requireCompanyMember(c, companyId, ['company_admin'])
+  const parsed = serviceStatesSchema.safeParse(await c.req.json())
+  if (!parsed.success)
+    throw new HttpError(
+      422,
+      'invalid_service_states',
+      'Choose one or more valid service states.',
+      validationFields(parsed.error),
+    )
+  const db = drizzle(c.env.DB)
+  const [company] = await db.select().from(companies).where(eq(companies.id, companyId)).limit(1)
+  if (!company) throw new HttpError(404, 'company_not_found', 'Company not found.')
+  const existingAreas = await db
+    .select({ state: companyServiceAreas.state })
+    .from(companyServiceAreas)
+    .where(eq(companyServiceAreas.companyId, companyId))
+  const now = new Date().toISOString()
+  const selectedStates = parsed.data.states
+  const existingStates = new Set(existingAreas.map((area) => area.state))
+  const missingStates = selectedStates.filter((state) => !existingStates.has(state))
+  const status = company.status === 'verified' ? 'pending' : company.status
+  await db.batch([
+    db
+      .delete(companyServiceAreas)
+      .where(
+        and(
+          eq(companyServiceAreas.companyId, companyId),
+          notInArray(companyServiceAreas.state, selectedStates),
+        ),
+      ),
+    ...missingStates.map((state) =>
+      db.insert(companyServiceAreas).values({
+        id: crypto.randomUUID(),
+        companyId,
+        city: STATEWIDE_SERVICE_AREA_CITY,
+        state,
+        zip: null,
+        radiusMiles: null,
+        createdAt: now,
+      }),
+    ),
+    db.update(companies).set({ status, updatedAt: now }).where(eq(companies.id, companyId)),
+  ])
+  await writeAudit(c, {
+    action: 'company.service_states_updated',
+    targetType: 'company',
+    targetId: companyId,
+    companyId,
+    details: {
+      actorId: actor.id,
+      states: selectedStates.join(','),
+      requiresReview: company.status === 'verified',
+    },
+  })
+  return ok(c, { id: companyId, states: selectedStates, status })
 })
 
 app.post('/companies/:id/verification-documents', async (c) => {

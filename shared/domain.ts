@@ -75,6 +75,7 @@ export interface CompanySummary {
   categories: string[]
   city: string
   state: string
+  serviceStates?: string[]
   serviceRadiusMiles: number
   rating: number
   reviewCount: number

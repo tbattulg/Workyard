@@ -21,8 +21,10 @@ INSERT OR IGNORE INTO `company_members` (`company_id`, `user_id`, `role`, `statu
 
 INSERT OR IGNORE INTO `company_service_areas` (`id`, `company_id`, `city`, `state`, `zip`, `radius_miles`, `created_at`) VALUES
   ('30000000-0000-4000-8000-000000000001', '11111111-1111-4111-8111-111111111111', 'Chicago', 'IL', '60654', 28, '2026-06-15T00:00:00.000Z'),
+  ('30000000-0000-4000-8000-000000000004', '11111111-1111-4111-8111-111111111111', 'Statewide', 'IN', NULL, NULL, '2026-06-15T00:00:00.000Z'),
   ('30000000-0000-4000-8000-000000000002', '22222222-2222-4222-8222-222222222222', 'Oak Park', 'IL', '60301', 35, '2026-06-15T00:00:00.000Z'),
-  ('30000000-0000-4000-8000-000000000003', '33333333-3333-4333-8333-333333333333', 'Evanston', 'IL', '60201', 40, '2026-06-15T00:00:00.000Z');
+  ('30000000-0000-4000-8000-000000000003', '33333333-3333-4333-8333-333333333333', 'Evanston', 'IL', '60201', 40, '2026-06-15T00:00:00.000Z'),
+  ('30000000-0000-4000-8000-000000000005', '33333333-3333-4333-8333-333333333333', 'Statewide', 'WI', NULL, NULL, '2026-06-15T00:00:00.000Z');
 
 INSERT OR IGNORE INTO `services` (`id`, `company_id`, `category_id`, `title`, `slug`, `description`, `pricing_type`, `starting_price_cents`, `active`, `created_at`, `updated_at`) VALUES
   ('20000000-0000-4000-8000-000000000001', '11111111-1111-4111-8111-111111111111', '10000000-0000-4000-8000-000000000001', 'Electrical repair and upgrades', 'electrical-repair-upgrades', 'Troubleshooting, service upgrades, panel work, rewiring, and code corrections.', 'quote', NULL, 1, '2026-06-15T00:00:00.000Z', '2026-06-15T00:00:00.000Z'),
