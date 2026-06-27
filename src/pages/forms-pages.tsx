@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { SignInButton, useAuth } from '@clerk/react'
-import { CheckCircle2, FileUp, Minus, Plus, Send } from 'lucide-react'
+import { CheckCircle2, Minus, Plus, Send } from 'lucide-react'
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form'
 import { useSearchParams } from 'react-router-dom'
@@ -212,16 +212,6 @@ function QuoteRequestForm({ getAuthToken }: { getAuthToken?: () => Promise<strin
                 <option>$50,000+</option>
               </select>
             </Field>
-          </div>
-          <div className="rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-7 text-center">
-            <FileUp className="mx-auto text-slate-500" />
-            <p className="mt-3 font-bold">Photos and documents</p>
-            <p className="mt-1 text-sm text-slate-500">
-              JPEG, PNG, WebP, or PDF. Up to 20 MB each.
-            </p>
-            <SecondaryButton className="mt-4" type="button">
-              Choose files
-            </SecondaryButton>
           </div>
         </Card>
 
@@ -473,7 +463,9 @@ export function InvoiceBuilderPage() {
             </dl>
             <div className="mt-6 grid gap-3">
               <Button type="button">Save draft</Button>
-              <SecondaryButton type="button">Preview PDF</SecondaryButton>
+              <SecondaryButton type="button">
+                <Send size={16} /> Send invoice
+              </SecondaryButton>
             </div>
             <p className="mt-4 text-xs leading-5 text-slate-500">
               Once sent, this invoice becomes immutable. Corrections create a new revision.

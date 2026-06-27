@@ -92,7 +92,7 @@ test('operator workflow surfaces cover leads jobs invoices and admin verificatio
   await expect(page.getByRole('heading', { name: /build invoice/i })).toBeVisible()
   await expect(page.getByRole('heading', { name: /invoice summary/i })).toBeVisible()
   await expect(page.getByText(/once sent, this invoice becomes immutable/i)).toBeVisible()
-  await expect(page.getByRole('button', { name: /preview pdf/i })).toBeVisible()
+  await expect(page.getByRole('button', { name: /send invoice/i })).toBeVisible()
 
   await page.goto('/admin')
   await expect(page.getByRole('heading', { name: /trust and safety/i })).toBeVisible()

@@ -4,7 +4,7 @@
 - Tenant-owned records are queried with both record ID and company or buyer ownership.
 - Company suspension disables profile publication and all company mutations.
 - Quote, proposal-send, invoice-send, and payment-record endpoints require idempotency keys.
-- File uploads accept JPEG, PNG, WebP, and PDF only, enforce a 20 MB content length, inspect magic bytes, and use private R2 objects.
+- File uploads are deferred while R2 is not in current scope. If uploads are re-enabled, they must use private storage, strict type validation, size limits, and authorization-checked download routes.
 - Logs contain request IDs, route names, status, and actor IDs; message bodies, addresses, tokens, and invoice details are excluded.
 - Secrets are configured with Cloudflare secret bindings and never committed.
 - Public forms are designed for Turnstile and per-IP rate limits.

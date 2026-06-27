@@ -78,7 +78,6 @@ import { sendInvoiceEmail } from './lib/email'
 import { canAccessFile, MAX_UPLOAD_BYTES, requireFileStorage, validateFile } from './lib/files'
 import { handleError, HttpError, ok, validationFields } from './lib/http'
 import { executeIdempotently } from './lib/idempotency'
-import { createInvoicePdf } from './lib/pdf'
 import type { AppEnv } from './lib/types'
 
 export const app = new Hono<AppEnv>().basePath('/api/v1')
@@ -1790,11 +1789,6 @@ app.post('/invoices/:id/send', async (c) => {
       .where(eq(companies.id, invoice.companyId))
       .limit(1)
     const [buyer] = await db.select().from(users).where(eq(users.id, invoice.buyerId)).limit(1)
-    const items = await db
-      .select()
-      .from(invoiceItems)
-      .where(eq(invoiceItems.invoiceId, invoice.id))
-      .orderBy(invoiceItems.sortOrder)
     if (!job || !company || !buyer)
       throw new HttpError(
         500,
@@ -1807,55 +1801,12 @@ app.post('/invoices/:id/send', async (c) => {
         'job_not_ready_for_invoice',
         'Mark the job as awaiting invoice before sending billing.',
       )
-    const pdf = await createInvoicePdf({
-      invoiceNumber: invoice.invoiceNumber,
-      companyName: company.name,
-      buyerName: buyer.name,
-      jobTitle: job.title,
-      issueDate: invoice.issueDate,
-      dueDate: invoice.dueDate,
-      items,
-      subtotalCents: invoice.subtotalCents,
-      taxCents: invoice.taxCents,
-      discountCents: invoice.discountCents,
-      retainageCents: invoice.retainageCents,
-      totalCents: invoice.totalCents,
-      notes: invoice.notes,
-    })
-    const fileId = crypto.randomUUID()
-    const objectKey = `invoices/${invoice.companyId}/${invoice.id}/revision-${invoice.revisionNumber}.pdf`
-    const fileStorage = requireFileStorage(c)
-    await fileStorage.put(objectKey, pdf, {
-      httpMetadata: {
-        contentType: 'application/pdf',
-        contentDisposition: `attachment; filename="${invoice.invoiceNumber}.pdf"`,
-      },
-    })
-    const checksum = await crypto.subtle.digest('SHA-256', new Uint8Array(pdf).buffer)
-    const checksumSha256 = Array.from(new Uint8Array(checksum), (byte) =>
-      byte.toString(16).padStart(2, '0'),
-    ).join('')
     const now = new Date().toISOString()
     const emailDeliveryId = crypto.randomUUID()
     await db.batch([
-      db.insert(files).values({
-        id: fileId,
-        ownerUserId: actor.id,
-        companyId: invoice.companyId,
-        jobId: invoice.jobId,
-        invoiceId: invoice.id,
-        objectKey,
-        originalName: `${invoice.invoiceNumber}.pdf`,
-        mimeType: 'application/pdf',
-        sizeBytes: pdf.byteLength,
-        checksumSha256,
-        visibility: 'invoice_participants',
-        scanStatus: 'clean',
-        createdAt: now,
-      }),
       db
         .update(invoices)
-        .set({ status: 'sent', sentAt: now, pdfFileId: fileId, updatedAt: now })
+        .set({ status: 'sent', sentAt: now, updatedAt: now })
         .where(eq(invoices.id, invoice.id)),
       ...(job.status === 'awaiting_invoice'
         ? [
@@ -1927,7 +1878,7 @@ app.post('/invoices/:id/send', async (c) => {
         }),
       )
     }
-    return { id: invoice.id, status: 'sent' as const, pdfFileId: fileId }
+    return { id: invoice.id, status: 'sent' as const }
   })
   return ok(c, result.value)
 })

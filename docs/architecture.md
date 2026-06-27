@@ -4,7 +4,7 @@
 
 The browser is an untrusted client. Pages Functions validate Clerk sessions, derive Workyard roles from D1, enforce company ownership on every query, and return only authorized records. Public company and service searches expose approved profile fields only.
 
-The application uses one D1 database and one private R2 bucket per environment. Files are represented by metadata rows before upload and can only be downloaded through short-lived, authorization-checked API routes.
+The current application scope uses one D1 database per environment. File storage through R2 is deferred; upload routes remain unavailable unless a future release binds private object storage. Invoices are stored as application records and sent as email/dashboard notifications without generated PDF files.
 
 ## Domain lifecycle
 

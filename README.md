@@ -8,8 +8,8 @@ Workyard connects buyers with manually verified trade businesses, carries a proj
 
 - React, TypeScript, Vite, React Router, TanStack Query
 - Hono API in Cloudflare Pages Functions
-- Cloudflare D1 and private R2 storage
-- Drizzle ORM, Zod, Clerk, Resend, Mapbox, pdf-lib
+- Cloudflare D1
+- Drizzle ORM, Zod, Clerk, Resend, Mapbox
 - Vitest, Playwright, ESLint, Prettier
 
 ## Local setup
@@ -28,7 +28,7 @@ Run `npm run check` before committing. End-to-end tests use `npm run test:e2e`.
 
 ## Deployment
 
-Deployment is documented in `docs/deployment.md`. Cloudflare resources are isolated from the existing Invoice Maker project.
+Deployment is documented in `docs/deployment.md`. Cloudflare resources are isolated from the existing Invoice Maker project. File storage through R2 and generated invoice PDFs are deferred from the current build.
 
 ## Legal status
 

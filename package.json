@@ -26,10 +26,10 @@
     "cf:types": "wrangler types worker-configuration.d.ts"
   },
   "dependencies": {
-    "@clerk/react": "latest",
     "@clerk/backend": "latest",
-    "@hookform/resolvers": "latest",
+    "@clerk/react": "latest",
     "@hono/zod-validator": "latest",
+    "@hookform/resolvers": "latest",
     "@radix-ui/react-dialog": "latest",
     "@radix-ui/react-dropdown-menu": "latest",
     "@radix-ui/react-label": "latest",
@@ -40,7 +40,6 @@
     "drizzle-orm": "latest",
     "hono": "latest",
     "lucide-react": "latest",
-    "pdf-lib": "latest",
     "react": "latest",
     "react-dom": "latest",
     "react-hook-form": "latest",

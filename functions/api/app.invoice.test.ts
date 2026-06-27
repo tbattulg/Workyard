@@ -332,15 +332,7 @@ describe('invoice and review launch-blocker routes', () => {
     })
   })
 
-  it('stores sent invoice PDFs privately and records failed email delivery without blocking send', async () => {
-    type PutCall = [
-      string,
-      Uint8Array,
-      { httpMetadata: { contentType?: string; contentDisposition?: string } },
-    ]
-    const put = vi.fn<(...args: PutCall) => Promise<Record<string, never>>>(() =>
-      Promise.resolve({}),
-    )
+  it('sends invoices without requiring PDF storage and records failed email delivery', async () => {
     mockAuthenticatedClerkUser()
     mocks.selectResults = [
       [userRecord()],
@@ -357,7 +349,6 @@ describe('invoice and review launch-blocker routes', () => {
       ],
       [{ id: companyId, name: 'Northside Electric' }],
       [{ id: buyerId, name: 'Jordan Rivera', email: 'jordan@example.com' }],
-      [invoiceItem()],
     ]
 
     const response = await app.request(
@@ -367,14 +358,12 @@ describe('invoice and review launch-blocker routes', () => {
         headers: { 'Idempotency-Key': 'invoice-send-001' },
         body: '{}',
       },
-      env({ FILES: { put } as unknown as R2Bucket }),
+      env(),
     )
     const body = await readJson(response)
     const storedFile = insertedWhere(
       (value) => value.invoiceId === invoiceId && value.mimeType === 'application/pdf',
     )
-    expect(put).toHaveBeenCalledTimes(1)
-    const [objectKey, pdf, options] = put.mock.calls[0]!
     const sentUpdate = mocks.updates.find(
       (value) =>
         typeof value === 'object' &&
@@ -390,23 +379,9 @@ describe('invoice and review launch-blocker routes', () => {
 
     expect(response.status).toBe(200)
     expect(body.data).toMatchObject({ id: invoiceId, status: 'sent' })
-    expect(body.data?.pdfFileId).toEqual(expect.any(String))
-    expect(objectKey).toBe(`invoices/${companyId}/${invoiceId}/revision-1.pdf`)
-    expect(pdf).toBeInstanceOf(Uint8Array)
-    expect(options.httpMetadata.contentType).toBe('application/pdf')
-    expect(storedFile).toMatchObject({
-      ownerUserId: 'admin_1',
-      companyId,
-      jobId,
-      invoiceId,
-      objectKey: `invoices/${companyId}/${invoiceId}/revision-1.pdf`,
-      originalName: 'INV-2026-00001.pdf',
-      mimeType: 'application/pdf',
-      visibility: 'invoice_participants',
-      scanStatus: 'clean',
-    })
-    expect(String(storedFile?.checksumSha256)).toHaveLength(64)
-    expect(sentUpdate).toMatchObject({ status: 'sent', pdfFileId: body.data?.pdfFileId })
+    expect(body.data?.pdfFileId).toBeUndefined()
+    expect(storedFile).toBeUndefined()
+    expect(sentUpdate).toMatchObject({ status: 'sent' })
     expect(failedEmailUpdate).toMatchObject({
       status: 'failed',
       lastErrorCode: 'provider_not_configured',

@@ -52,7 +52,7 @@ export function requireFileStorage(c: Context<AppEnv>): R2Bucket {
     throw new HttpError(
       503,
       'file_storage_unavailable',
-      'File storage is not configured yet. Enable R2 and bind FILES before using uploads or invoice PDFs.',
+      'File storage is not configured yet. Enable R2 and bind FILES before using uploads.',
     )
   }
   return c.env.FILES
