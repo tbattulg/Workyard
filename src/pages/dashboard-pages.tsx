@@ -173,21 +173,21 @@ export function CompanyDashboardPage() {
                 {
                   project: '200A panel upgrade',
                   buyer: 'Morgan Lee',
-                  location: 'Lincoln Square',
+                  location: 'Cleveland',
                   received: '18 min ago',
                   status: 'New',
                 },
                 {
                   project: 'Retail lighting repair',
                   buyer: 'Northstar Properties',
-                  location: 'Lakeview',
+                  location: 'Austin',
                   received: '1h 12m ago',
                   status: 'Viewed',
                 },
                 {
                   project: 'Kitchen circuit additions',
                   buyer: 'Jamie Carter',
-                  location: 'Oak Park',
+                  location: 'Raleigh',
                   received: 'Yesterday',
                   status: 'Proposal sent',
                 },
@@ -431,9 +431,9 @@ export function LeadsPage() {
       title="Lead inbox"
       subtitle="Review project details, reply, and prepare proposals."
       items={[
-        ['200A panel upgrade', 'New - Lincoln Square', '18 minutes ago'],
-        ['Retail lighting repair', 'Viewed - Lakeview', '1 hour ago'],
-        ['Kitchen circuit additions', 'Proposal sent - Oak Park', 'Yesterday'],
+        ['200A panel upgrade', 'New - Cleveland', '18 minutes ago'],
+        ['Retail lighting repair', 'Viewed - Austin', '1 hour ago'],
+        ['Kitchen circuit additions', 'Proposal sent - Raleigh', 'Yesterday'],
       ]}
       icon={<MessageSquareText />}
     />
@@ -571,7 +571,7 @@ export function AdminPage() {
           <SecondaryButton>Open audit log</SecondaryButton>
         </div>
         <div className="mt-5 grid gap-4">
-          {['Chicago Masonry Group', 'Windy City Plumbing Partners', 'West Side Roofing Co.'].map(
+          {['Canyon Masonry Group', 'Riverbend Plumbing Partners', 'Summit Roofing Co.'].map(
             (name) => (
               <div
                 key={name}

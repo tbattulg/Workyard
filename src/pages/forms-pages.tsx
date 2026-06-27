@@ -81,7 +81,7 @@ function QuoteRequestForm({ getAuthToken }: { getAuthToken?: () => Promise<strin
     formState: { errors, isSubmitting },
   } = useForm<QuoteForm>({
     resolver: zodResolver(quoteFormSchema),
-    defaultValues: { projectCity: 'Chicago', projectState: 'IL' },
+    defaultValues: { projectCity: '', projectState: '' },
   })
 
   const submit = (event: FormEvent<HTMLFormElement>) => {

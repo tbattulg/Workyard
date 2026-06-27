@@ -10,14 +10,14 @@ describe('quote request validation', () => {
       companyId,
       name: 'Jordan Lee',
       email: 'jordan@example.com',
-      phone: '312-555-0199',
-      projectAddress: '1234 W Grand Ave',
-      projectCity: 'Chicago',
-      projectState: 'il',
-      projectZip: '60642',
+      phone: '303-555-0199',
+      projectAddress: '1234 Market St',
+      projectCity: 'Denver',
+      projectState: 'co',
+      projectZip: '80202',
       jobDescription: 'Replace the electrical panel and inspect the service entrance.',
     })
-    expect(result.projectState).toBe('IL')
+    expect(result.projectState).toBe('CO')
   })
 
   it('rejects an inverted budget range', () => {
@@ -25,11 +25,11 @@ describe('quote request validation', () => {
       companyId,
       name: 'Jordan Lee',
       email: 'jordan@example.com',
-      phone: '312-555-0199',
-      projectAddress: '1234 W Grand Ave',
-      projectCity: 'Chicago',
-      projectState: 'IL',
-      projectZip: '60642',
+      phone: '303-555-0199',
+      projectAddress: '1234 Market St',
+      projectCity: 'Denver',
+      projectState: 'CO',
+      projectZip: '80202',
       jobDescription: 'Replace the electrical panel and inspect the service entrance.',
       budgetMinCents: 500_000,
       budgetMaxCents: 100_000,
@@ -42,11 +42,11 @@ describe('quote request validation', () => {
       companyId,
       name: 'Jordan Lee',
       email: 'jordan@example.com',
-      phone: '312-555-0199',
-      projectAddress: '1234 W Grand Ave',
-      projectCity: 'Chicago',
+      phone: '303-555-0199',
+      projectAddress: '1234 Market St',
+      projectCity: 'Denver',
       projectState: 'ZZ',
-      projectZip: '60642',
+      projectZip: '80202',
       jobDescription: 'Replace the electrical panel and inspect the service entrance.',
     })
     expect(result.success).toBe(false)

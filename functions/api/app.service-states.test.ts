@@ -132,13 +132,13 @@ function env(overrides: Partial<AppBindings> = {}): AppBindings {
     PUBLIC_APP_URL: 'https://preview.contractor-marketplace.pages.dev',
     VITE_PUBLIC_APP_NAME: 'Workyard',
     VITE_PUBLIC_APP_URL: 'https://preview.contractor-marketplace.pages.dev',
-    PILOT_MARKET: 'Chicago',
+    SERVICE_MARKET: 'United States',
     ALLOW_DEMO_AUTH: 'false',
     CLERK_SECRET_KEY: 'sk_test',
     CLERK_PUBLISHABLE_KEY: 'pk_test',
     CLERK_JWT_KEY: 'jwt-key',
     ...overrides,
-  } as AppBindings
+  }
 }
 
 function userRecord(overrides: Record<string, unknown> = {}) {
@@ -167,12 +167,12 @@ function searchRow(overrides: Record<string, unknown> = {}) {
     id: companyId,
     name: 'Lakefront Electric Co.',
     slug: 'lakefront-electric',
-    description: 'Licensed residential and light-commercial electrical work across Chicago.',
-    city: 'Chicago',
-    state: 'IL',
+    description: 'Licensed residential and light-commercial electrical work for regional properties.',
+    city: 'Cleveland',
+    state: 'OH',
     serviceRadiusMiles: 28,
     licenseNumber: 'ECC-10482',
-    serviceState: 'IL',
+    serviceState: 'OH',
     category: 'Electrical',
     rating: 4.9,
     reviewCount: 12,
@@ -345,8 +345,8 @@ describe('public company search service state filtering', () => {
           id: '22222222-2222-4222-8222-222222222222',
           name: 'Prairie & Stone Builders',
           slug: 'prairie-stone-builders',
-          city: 'Oak Park',
-          state: 'IN',
+          city: 'Denver',
+          state: 'CO',
           serviceState: 'IL',
           category: 'Remodeling',
         }),

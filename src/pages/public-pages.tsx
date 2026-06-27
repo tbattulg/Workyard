@@ -27,7 +27,6 @@ export function HomePage() {
         <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(to_right,#fbbf24_1px,transparent_1px),linear-gradient(to_bottom,#fbbf24_1px,transparent_1px)] [background-size:48px_48px]" />
         <div className="relative mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[1.15fr_.85fr] lg:px-8 lg:py-28">
           <div>
-            <Badge tone="warning">Now serving Chicago</Badge>
             <h1 className="mt-6 max-w-3xl text-4xl font-black leading-tight tracking-tight sm:text-6xl">
               Find the right contractor. Keep the whole job clear.
             </h1>
@@ -117,7 +116,7 @@ export function HomePage() {
               {
                 icon: Search,
                 title: 'Discover',
-                text: 'Search verified companies by service and Chicago-area location.',
+                text: 'Search verified companies by service and state.',
               },
               {
                 icon: MessageSquareText,
@@ -174,7 +173,7 @@ export function BrowsePage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
       <div className="max-w-3xl">
-        <Badge tone="warning">Chicago pilot marketplace</Badge>
+        <Badge tone="warning">U.S. marketplace</Badge>
         <h1 className="mt-4 text-4xl font-black tracking-tight">Browse verified contractors</h1>
         <p className="mt-3 text-lg text-slate-600">
           Search by trade, project need, or service area.

@@ -28,7 +28,7 @@ Do not reuse or modify the existing Invoice Maker Pages project or D1 database.
 - Preview Git deployments are restricted to the `preview` branch so public aliases stay neutral.
 - Build command is `npm run build`; output directory is `dist`.
 - Preview and production Pages environments have separate `DB` bindings.
-- Public build variables are set for the Workyard display brand, Chicago pilot, and preview branch domain.
+- Public build variables are set for the Workyard display brand, U.S. service coverage, and preview branch domain.
 - Root `wrangler.jsonc` vars represent the preview deployment because Pages reads them during Git builds; local browser values should be supplied through `.env` / `.dev.vars`.
 - Pages logging, Sentry, Web Analytics, and uptime checks should be configured outside `wrangler.jsonc`; Pages currently rejects the Workers-only `observability` field during Git builds.
 

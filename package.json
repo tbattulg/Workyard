@@ -20,7 +20,7 @@
     "check": "npm run typecheck && npm run lint && npm run test && npm run build",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply workyard-db-preview --local",
-    "db:seed:local": "wrangler d1 execute workyard-db-preview --local --file ./seed/chicago-demo.sql",
+    "db:seed:local": "wrangler d1 execute workyard-db-preview --local --file ./seed/us-demo.sql",
     "db:migrate:preview": "wrangler d1 migrations apply workyard-db-preview --remote",
     "db:migrate:production": "wrangler d1 migrations apply workyard-db-production --env production --remote",
     "cf:types": "wrangler types worker-configuration.d.ts"

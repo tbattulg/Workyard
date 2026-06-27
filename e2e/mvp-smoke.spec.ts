@@ -25,10 +25,10 @@ test('buyer can browse a contractor and open the quote form', async ({ page }) =
 
 test('buyer can filter marketplace results by service state', async ({ page }) => {
   await page.goto('/browse')
-  await page.getByLabel('Filter by state').selectOption('IN')
+  await page.getByLabel('Filter by state').selectOption('PA')
   await page.getByRole('button', { name: /^search$/i }).click()
 
-  await expect(page).toHaveURL(/state=IN/)
+  await expect(page).toHaveURL(/state=PA/)
   await expect(page.getByRole('heading', { name: /lakefront electric/i })).toBeVisible()
   await expect(page.getByRole('heading', { name: /prairie & stone/i })).toHaveCount(0)
 })
@@ -39,9 +39,9 @@ test('quote form validates and completes in demo fallback mode', async ({ page }
   await page.getByLabel('Email').fill('jordan@example.com')
   await page.getByLabel('Phone').fill('312-555-0199')
   await page.getByLabel('Street address').fill('1234 W Grand Ave')
-  await page.getByLabel('City').fill('Chicago')
-  await page.getByLabel('State').fill('IL')
-  await page.getByLabel('ZIP code').fill('60642')
+  await page.getByLabel('City').fill('Denver')
+  await page.getByLabel('State').fill('CO')
+  await page.getByLabel('ZIP code').fill('80202')
   await page
     .getByLabel('Describe the work')
     .fill('Replace a damaged electrical panel and inspect the service entrance for code issues.')
@@ -64,7 +64,7 @@ test('operator workflow surfaces cover leads jobs invoices and admin verificatio
   await page.goto('/dashboard/leads')
   await expect(page.getByRole('heading', { name: /^lead inbox$/i })).toBeVisible()
   await expect(page.getByText(/review project details/i)).toBeVisible()
-  await expect(page.getByText(/proposal sent - oak park/i)).toBeVisible()
+  await expect(page.getByText(/proposal sent - raleigh/i)).toBeVisible()
 
   await page.goto('/dashboard/jobs')
   await expect(page.getByRole('heading', { name: /^jobs$/i })).toBeVisible()
@@ -83,6 +83,6 @@ test('operator workflow surfaces cover leads jobs invoices and admin verificatio
   await page.goto('/admin')
   await expect(page.getByRole('heading', { name: /trust and safety/i })).toBeVisible()
   await expect(page.getByRole('heading', { name: /pending companies/i })).toBeVisible()
-  await expect(page.getByText(/chicago masonry group/i)).toBeVisible()
+  await expect(page.getByText(/canyon masonry group/i)).toBeVisible()
   await expect(page.getByRole('button', { name: /approve/i }).first()).toBeVisible()
 })

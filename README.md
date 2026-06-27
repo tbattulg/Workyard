@@ -1,6 +1,6 @@
 # Workyard
 
-Workyard is a Chicago-first construction services marketplace. The public brand is configured with `VITE_PUBLIC_APP_NAME`.
+Workyard is a U.S.-wide construction services marketplace. The public brand is configured with `VITE_PUBLIC_APP_NAME`.
 
 Workyard connects buyers with manually verified trade businesses, carries a project from quote request through proposal and job tracking, and produces itemized post-work invoices. It does not process payments.
 

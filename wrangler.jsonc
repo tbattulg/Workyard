@@ -10,7 +10,7 @@
     "PUBLIC_APP_URL": "https://preview.contractor-marketplace.pages.dev",
     "VITE_PUBLIC_APP_NAME": "Workyard",
     "VITE_PUBLIC_APP_URL": "https://preview.contractor-marketplace.pages.dev",
-    "PILOT_MARKET": "Chicago, IL",
+    "SERVICE_MARKET": "United States",
     "ALLOW_DEMO_AUTH": "true",
   },
   "d1_databases": [
@@ -32,7 +32,7 @@
         "PUBLIC_APP_URL": "https://contractor-marketplace.pages.dev",
         "VITE_PUBLIC_APP_NAME": "Workyard",
         "VITE_PUBLIC_APP_URL": "https://contractor-marketplace.pages.dev",
-        "PILOT_MARKET": "Chicago, IL",
+        "SERVICE_MARKET": "United States",
         "ALLOW_DEMO_AUTH": "false",
       },
       "d1_databases": [

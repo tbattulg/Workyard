@@ -52,13 +52,13 @@ function env(overrides: Partial<AppBindings> = {}): AppBindings {
     PUBLIC_APP_URL: 'https://preview.contractor-marketplace.pages.dev',
     VITE_PUBLIC_APP_NAME: 'Workyard',
     VITE_PUBLIC_APP_URL: 'https://preview.contractor-marketplace.pages.dev',
-    PILOT_MARKET: 'Chicago',
+    SERVICE_MARKET: 'United States',
     ALLOW_DEMO_AUTH: 'false',
     CLERK_SECRET_KEY: 'sk_test',
     CLERK_PUBLISHABLE_KEY: 'pk_test',
     CLERK_JWT_KEY: 'jwt-key',
     ...overrides,
-  } as AppBindings
+  }
 }
 
 function userRecord(overrides: Record<string, unknown> = {}) {
