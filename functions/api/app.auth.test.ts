@@ -48,9 +48,9 @@ function env(overrides: Partial<AppBindings> = {}): AppBindings {
   return {
     DB: {} as D1Database,
     ENVIRONMENT: 'preview',
-    PUBLIC_APP_NAME: 'Contractor Marketplace',
+    PUBLIC_APP_NAME: 'Workyard',
     PUBLIC_APP_URL: 'https://preview.contractor-marketplace.pages.dev',
-    VITE_PUBLIC_APP_NAME: 'Contractor Marketplace',
+    VITE_PUBLIC_APP_NAME: 'Workyard',
     VITE_PUBLIC_APP_URL: 'https://preview.contractor-marketplace.pages.dev',
     PILOT_MARKET: 'Chicago',
     ALLOW_DEMO_AUTH: 'false',

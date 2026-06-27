@@ -6,7 +6,7 @@ const env: Pick<
   AppBindings,
   'PUBLIC_APP_NAME' | 'PUBLIC_APP_URL' | 'RESEND_API_KEY' | 'SUPPORT_EMAIL'
 > = {
-  PUBLIC_APP_NAME: 'Contractor Marketplace',
+  PUBLIC_APP_NAME: 'Workyard',
   PUBLIC_APP_URL: 'https://preview.contractor-marketplace.pages.dev',
   RESEND_API_KEY: 're_test',
   SUPPORT_EMAIL: 'support@example.com',
@@ -52,7 +52,7 @@ describe('sendInvoiceEmail', () => {
       'Content-Type': 'application/json',
     })
     expect(body).toMatchObject({
-      from: 'Contractor Marketplace <support@example.com>',
+      from: 'Workyard <support@example.com>',
       to: ['buyer@example.com'],
       subject: 'Invoice INV-2026-00001 from North Branch Electric',
     })

@@ -93,7 +93,7 @@ function getDisplayName(user: UserJSON, email: string) {
   const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ').trim()
   if (fullName) return fullName
   if (user.username) return user.username
-  return email.split('@')[0] || 'Contractor Marketplace User'
+  return email.split('@')[0] || 'Workyard User'
 }
 
 function getPlatformRole(metadata: Record<string, unknown> | null | undefined): UserRole | null {

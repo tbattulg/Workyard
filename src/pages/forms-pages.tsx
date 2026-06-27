@@ -56,7 +56,7 @@ function AuthenticatedQuoteRequestPage() {
         <Card className="p-10 text-center">
           <h1 className="text-3xl font-black">Sign in to request a quote</h1>
           <p className="mt-3 text-slate-600">
-            Contractor Marketplace uses verified accounts to protect project details.
+            Workyard uses verified accounts to protect project details.
           </p>
           <SignInButton mode="modal">
             <Button className="mt-6" type="button">

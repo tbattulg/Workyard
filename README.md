@@ -1,8 +1,8 @@
-# Contractor Marketplace
+# Workyard
 
-Workyard is the internal codename for a Chicago-first construction services marketplace. The public brand is configured with `VITE_PUBLIC_APP_NAME` and must remain neutral until trademark review is complete.
+Workyard is a Chicago-first construction services marketplace. The public brand is configured with `VITE_PUBLIC_APP_NAME`.
 
-Contractor Marketplace connects buyers with manually verified trade businesses, carries a project from quote request through proposal and job tracking, and produces itemized post-work invoices. It does not process payments.
+Workyard connects buyers with manually verified trade businesses, carries a project from quote request through proposal and job tracking, and produces itemized post-work invoices. It does not process payments.
 
 ## Stack
 

@@ -28,7 +28,7 @@ async function renderCompanyDashboard(clerkPublishableKey: string) {
   vi.doMock('../lib/config', () => ({
     appConfig: {
       clerkPublishableKey,
-      name: 'Contractor Marketplace',
+      name: 'Workyard',
     },
   }))
   const { CompanyDashboardPage } = await import('./dashboard-pages')

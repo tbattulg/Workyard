@@ -153,7 +153,7 @@ function AuthenticatedDashboardLayout({ children }: { children: ReactNode }) {
         <CardLike>
           <h1 className="text-3xl font-black">Sign in to continue</h1>
           <p className="mt-3 text-slate-600">
-            Dashboard access requires a verified Contractor Marketplace account.
+            Dashboard access requires a verified Workyard account.
           </p>
           <SignInButton mode="modal">
             <Button className="mt-6" type="button">
