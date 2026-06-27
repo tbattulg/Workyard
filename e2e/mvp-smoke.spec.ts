@@ -33,6 +33,20 @@ test('buyer can filter marketplace results by service state', async ({ page }) =
   await expect(page.getByRole('heading', { name: /prairie & stone/i })).toHaveCount(0)
 })
 
+test('buyer sees demo contractors when the live search API is empty', async ({ page }) => {
+  await page.route('**/api/v1/companies**', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ data: [], meta: { requestId: 'empty-test' } }),
+    })
+  })
+
+  await page.goto('/browse?q=solar')
+
+  await expect(page.getByRole('heading', { name: /desert sun electrical/i })).toBeVisible()
+  await expect(page.getByText(/demo contractors for testing/i)).toBeVisible()
+})
+
 test('quote form validates and completes in demo fallback mode', async ({ page }) => {
   await page.goto('/request-quote?company=11111111-1111-4111-8111-111111111111')
   await page.getByLabel('Name').fill('Jordan Lee')

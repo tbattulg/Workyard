@@ -168,7 +168,10 @@ export function BrowsePage() {
     queryFn: () => apiRequest<CompanySummary[]>(`/companies?${search.toString()}`),
     retry: false,
   })
-  const filtered = companiesQuery.data ?? filteredDemo
+  const liveCompanies = companiesQuery.data
+  const useDemoFallback =
+    companiesQuery.isError || (liveCompanies?.length === 0 && filteredDemo.length > 0)
+  const filtered = useDemoFallback ? filteredDemo : (liveCompanies ?? filteredDemo)
   const emptyLocation = state ? stateNameForCode(state) : 'those filters'
   return (
     <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
@@ -240,9 +243,9 @@ export function BrowsePage() {
           ))}
         </div>
       )}
-      {companiesQuery.isError ? (
+      {useDemoFallback ? (
         <p className="mt-4 text-sm text-slate-500" role="alert">
-          Showing demo companies until the Cloudflare API is connected locally.
+          Showing demo contractors for testing until live contractors are seeded.
         </p>
       ) : null}
       {!companiesQuery.isLoading && filtered.length === 0 ? (
