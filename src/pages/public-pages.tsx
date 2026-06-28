@@ -324,10 +324,9 @@ export function CompanyPage() {
     retry: false,
   })
   const company = companyQuery.data ?? fallbackCompany
-  const services =
-    companyQuery.data?.services?.map((service) => service.title) ??
-    demoServicesBySlug[fallbackCompany.slug] ??
-    []
+  const services: Array<{ id?: string; title: string }> =
+    companyQuery.data?.services?.map((service) => ({ id: service.id, title: service.title })) ??
+    (demoServicesBySlug[fallbackCompany.slug] ?? []).map((title) => ({ title }))
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
       <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
@@ -354,11 +353,19 @@ export function CompanyPage() {
             <h2 className="text-2xl font-black">Services</h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               {services.map((service) => (
-                <Card key={service} className="p-5">
-                  <h3 className="font-black">{service}</h3>
+                <Card key={service.title} className="p-5">
+                  <h3 className="font-black">{service.title}</h3>
                   <p className="mt-2 text-sm leading-6 text-slate-600">
-                    Request a site-specific quote with timing, address, and supporting photos.
+                    Request a site-specific quote with timing, address, and project scope.
                   </p>
+                  <Link
+                    to={`/request-quote?company=${company.id}${
+                      service.id ? `&service=${service.id}` : ''
+                    }&serviceName=${encodeURIComponent(service.title)}`}
+                    className="mt-4 inline-block"
+                  >
+                    <SecondaryButton>Request this service</SecondaryButton>
+                  </Link>
                 </Card>
               ))}
             </div>

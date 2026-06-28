@@ -4,6 +4,7 @@ export type UserRole = (typeof USER_ROLES)[number]
 export const QUOTE_STATUSES = [
   'new',
   'viewed',
+  'ready_for_proposal',
   'responded',
   'accepted',
   'declined',

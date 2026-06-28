@@ -57,6 +57,7 @@ import {
   canTransitionInvoice,
   canTransitionJob,
   canTransitionProposal,
+  canTransitionQuote,
 } from '../../shared/transitions'
 import { verifyWebhook } from '@clerk/backend/webhooks'
 import {
@@ -206,8 +207,8 @@ const serviceInputSchema = z.object({
   startingPriceCents: z.number().int().nonnegative().optional(),
 })
 
-const quoteCreateSchema = quoteRequestSchema.extend({
-  fileIds: z.array(uuidSchema).max(10).default([]),
+const quoteStatusUpdateSchema = z.object({
+  status: z.enum(['viewed', 'ready_for_proposal', 'declined']),
 })
 
 function slugify(value: string) {
@@ -966,7 +967,7 @@ app.delete('/companies/:id/favorite', async (c) => {
 app.post('/quotes', async (c) => {
   const actor = requireActor(c)
   const raw = await c.req.text()
-  const parsed = quoteCreateSchema.safeParse(JSON.parse(raw || '{}'))
+  const parsed = quoteRequestSchema.safeParse(JSON.parse(raw || '{}'))
   if (!parsed.success)
     throw new HttpError(
       422,
@@ -1008,36 +1009,14 @@ app.post('/quotes', async (c) => {
           eq(companyMembers.status, 'active'),
         ),
       )
-    const attachedFiles = parsed.data.fileIds.length
-      ? await db
-          .select({ id: files.id })
-          .from(files)
-          .where(
-            and(
-              inArray(files.id, parsed.data.fileIds),
-              eq(files.ownerUserId, actor.id),
-              isNull(files.quoteRequestId),
-              isNull(files.jobId),
-              isNull(files.deletedAt),
-              eq(files.scanStatus, 'clean'),
-            ),
-          )
-      : []
-    if (attachedFiles.length !== parsed.data.fileIds.length)
-      throw new HttpError(
-        422,
-        'invalid_file_attachment',
-        'One or more files cannot be attached to this request.',
-      )
     const now = new Date().toISOString()
     const quoteId = crypto.randomUUID()
     const threadId = crypto.randomUUID()
-    const quoteInput = quoteRequestSchema.parse(parsed.data)
     await db.batch([
       db.insert(quoteRequests).values({
         id: quoteId,
         buyerId: actor.id,
-        ...quoteInput,
+        ...parsed.data,
         status: 'new',
         createdAt: now,
         updatedAt: now,
@@ -1062,21 +1041,6 @@ app.post('/quotes', async (c) => {
         createdAt: now,
       }),
     ])
-    if (attachedFiles.length > 0) {
-      await db
-        .update(files)
-        .set({
-          quoteRequestId: quoteId,
-          companyId: company.id,
-          visibility: 'job_participants',
-        })
-        .where(
-          inArray(
-            files.id,
-            attachedFiles.map((file) => file.id),
-          ),
-        )
-    }
     if (companyAdmins.length > 0) {
       await db
         .insert(threadParticipants)
@@ -1205,6 +1169,151 @@ app.post('/quotes/:id/assign', async (c) => {
   return ok(c, { id: quote.id, assignedToUserId: member.userId })
 })
 
+app.patch('/quotes/:id/status', async (c) => {
+  const quoteId = uuidSchema.parse(c.req.param('id'))
+  const parsed = quoteStatusUpdateSchema.safeParse(await c.req.json())
+  if (!parsed.success)
+    throw new HttpError(
+      422,
+      'invalid_quote_status',
+      'Choose a valid lead action.',
+      validationFields(parsed.error),
+    )
+  const db = drizzle(c.env.DB)
+  const [quote] = await db
+    .select()
+    .from(quoteRequests)
+    .where(eq(quoteRequests.id, quoteId))
+    .limit(1)
+  if (!quote) throw new HttpError(404, 'quote_not_found', 'Quote request not found.')
+  const { actor } = await requireQuoteCompanyAccess(c, quote.companyId, quote.assignedToUserId)
+  if (quote.status === parsed.data.status) {
+    return ok(c, { id: quote.id, status: quote.status })
+  }
+  if (!canTransitionQuote(quote.status, parsed.data.status)) {
+    throw new HttpError(
+      409,
+      'invalid_transition',
+      `Cannot move a lead from ${quote.status} to ${parsed.data.status}.`,
+    )
+  }
+  const now = new Date().toISOString()
+  await db.batch([
+    db
+      .update(quoteRequests)
+      .set({ status: parsed.data.status, updatedAt: now })
+      .where(eq(quoteRequests.id, quote.id)),
+    ...(parsed.data.status === 'declined'
+      ? [
+          db.insert(notifications).values({
+            id: crypto.randomUUID(),
+            userId: quote.buyerId,
+            type: 'quote_declined',
+            title: 'Quote request declined',
+            body: 'The contractor declined this request.',
+            payloadJson: JSON.stringify({ quoteId: quote.id }),
+            createdAt: now,
+          }),
+        ]
+      : []),
+  ])
+  await writeAudit(c, {
+    action: 'quote.status_changed',
+    targetType: 'quote_request',
+    targetId: quote.id,
+    companyId: quote.companyId,
+    details: { from: quote.status, to: parsed.data.status, actorId: actor.id },
+  })
+  return ok(c, { id: quote.id, status: parsed.data.status })
+})
+
+app.get('/proposals', async (c) => {
+  const actor = requireActor(c)
+  const db = drizzle(c.env.DB)
+  const scope = c.req.query('scope') ?? 'buyer'
+  if (scope === 'buyer') {
+    const rows = await db
+      .select({
+        id: proposals.id,
+        quoteRequestId: proposals.quoteRequestId,
+        companyId: proposals.companyId,
+        companyName: companies.name,
+        title: proposals.title,
+        summary: proposals.summary,
+        subtotalCents: proposals.subtotalCents,
+        priceType: proposals.priceType,
+        priceMinCents: proposals.priceMinCents,
+        priceMaxCents: proposals.priceMaxCents,
+        assumptions: proposals.assumptions,
+        validUntil: proposals.validUntil,
+        notes: proposals.notes,
+        status: proposals.status,
+        sentAt: proposals.sentAt,
+        respondedAt: proposals.respondedAt,
+        projectType: quoteRequests.projectType,
+        projectCity: quoteRequests.projectCity,
+        projectState: quoteRequests.projectState,
+      })
+      .from(proposals)
+      .innerJoin(quoteRequests, eq(quoteRequests.id, proposals.quoteRequestId))
+      .innerJoin(companies, eq(companies.id, proposals.companyId))
+      .where(
+        and(
+          eq(quoteRequests.buyerId, actor.id),
+          notInArray(proposals.status, ['draft', 'withdrawn']),
+        ),
+      )
+      .orderBy(desc(proposals.updatedAt))
+      .limit(50)
+    return ok(c, rows)
+  }
+
+  const memberships = await db
+    .select({ companyId: companyMembers.companyId, role: companyMembers.role })
+    .from(companyMembers)
+    .where(and(eq(companyMembers.userId, actor.id), eq(companyMembers.status, 'active')))
+  if (actor.role !== 'platform_admin' && memberships.length === 0) return ok(c, [])
+  const isStaffOnly = memberships.length > 0 && memberships.every((item) => item.role === 'staff')
+  const rows = await db
+    .select({
+      id: proposals.id,
+      quoteRequestId: proposals.quoteRequestId,
+      companyId: proposals.companyId,
+      title: proposals.title,
+      summary: proposals.summary,
+      subtotalCents: proposals.subtotalCents,
+      priceType: proposals.priceType,
+      priceMinCents: proposals.priceMinCents,
+      priceMaxCents: proposals.priceMaxCents,
+      assumptions: proposals.assumptions,
+      validUntil: proposals.validUntil,
+      notes: proposals.notes,
+      status: proposals.status,
+      sentAt: proposals.sentAt,
+      respondedAt: proposals.respondedAt,
+      buyerName: quoteRequests.name,
+      projectType: quoteRequests.projectType,
+      projectCity: quoteRequests.projectCity,
+      projectState: quoteRequests.projectState,
+    })
+    .from(proposals)
+    .innerJoin(quoteRequests, eq(quoteRequests.id, proposals.quoteRequestId))
+    .where(
+      actor.role === 'platform_admin'
+        ? undefined
+        : and(
+            inArray(
+              proposals.companyId,
+              memberships.map((membership) => membership.companyId),
+            ),
+            isStaffOnly ? eq(quoteRequests.assignedToUserId, actor.id) : undefined,
+          ),
+    )
+    .orderBy(desc(proposals.updatedAt))
+    .limit(100)
+  return ok(c, rows)
+})
+
 app.post('/proposals', async (c) => {
   const raw = await c.req.text()
   const parsed = proposalSchema.safeParse(JSON.parse(raw || '{}'))
@@ -1222,6 +1331,9 @@ app.post('/proposals', async (c) => {
     .where(eq(quoteRequests.id, parsed.data.quoteRequestId))
     .limit(1)
   if (!quote) throw new HttpError(404, 'quote_not_found', 'Quote request not found.')
+  if (['declined', 'expired', 'converted'].includes(quote.status)) {
+    throw new HttpError(409, 'quote_not_open', 'This lead is no longer open for proposals.')
+  }
   const { actor } = await requireQuoteCompanyAccess(c, quote.companyId, quote.assignedToUserId, [
     'company_admin',
     'staff',
@@ -1229,14 +1341,42 @@ app.post('/proposals', async (c) => {
   const result = await executeIdempotently(c, actor, 'proposal.create', raw, async () => {
     const proposalId = crypto.randomUUID()
     const now = new Date().toISOString()
-    const itemValues = parsed.data.items.map((item, index) => ({
+    const providedItems = parsed.data.items ?? []
+    let itemValues = providedItems.map((item, index) => ({
       id: crypto.randomUUID(),
       proposalId,
       ...item,
       lineTotalCents: Math.round((item.quantityMilli * item.unitPriceCents) / 1000),
       sortOrder: index,
     }))
+    const itemSubtotalCents = itemValues.reduce((sum, item) => sum + item.lineTotalCents, 0)
+    const estimateCents =
+      parsed.data.priceType === 'range'
+        ? (parsed.data.priceMaxCents ?? itemSubtotalCents)
+        : (parsed.data.priceMaxCents ?? itemSubtotalCents)
+    if (itemValues.length === 0) {
+      itemValues = [
+        {
+          id: crypto.randomUUID(),
+          proposalId,
+          description: parsed.data.title,
+          quantityMilli: 1000,
+          unitPriceCents: estimateCents,
+          lineTotalCents: estimateCents,
+          itemType: 'labor' as const,
+          sortOrder: 0,
+        },
+      ]
+    }
     const subtotalCents = itemValues.reduce((sum, item) => sum + item.lineTotalCents, 0)
+    const priceMinCents =
+      parsed.data.priceType === 'range'
+        ? parsed.data.priceMinCents
+        : (parsed.data.priceMinCents ?? subtotalCents)
+    const priceMaxCents =
+      parsed.data.priceType === 'range'
+        ? parsed.data.priceMaxCents
+        : (parsed.data.priceMaxCents ?? subtotalCents)
     await db.batch([
       db.insert(proposals).values({
         id: proposalId,
@@ -1247,6 +1387,11 @@ app.post('/proposals', async (c) => {
         summary: parsed.data.summary,
         validUntil: parsed.data.validUntil,
         subtotalCents,
+        priceType: parsed.data.priceType,
+        priceMinCents,
+        priceMaxCents,
+        assumptions: parsed.data.assumptions,
+        notes: parsed.data.notes,
         status: 'draft',
         createdAt: now,
         updatedAt: now,
@@ -1275,6 +1420,15 @@ app.post('/proposals/:id/send', async (c) => {
   const { actor } = await requireCompanyMember(c, proposal.companyId, ['company_admin'])
   if (!canTransitionProposal(proposal.status, 'sent'))
     throw new HttpError(409, 'invalid_transition', 'Only draft proposals can be sent.')
+  const [quote] = await db
+    .select()
+    .from(quoteRequests)
+    .where(eq(quoteRequests.id, proposal.quoteRequestId))
+    .limit(1)
+  if (!quote) throw new HttpError(404, 'quote_not_found', 'Quote request not found.')
+  if (['declined', 'expired', 'converted'].includes(quote.status)) {
+    throw new HttpError(409, 'quote_not_open', 'This lead is no longer open for proposals.')
+  }
   const raw = await c.req.text()
   const result = await executeIdempotently(c, actor, 'proposal.send', raw || '{}', async () => {
     const now = new Date().toISOString()
@@ -1287,6 +1441,15 @@ app.post('/proposals/:id/send', async (c) => {
         .update(quoteRequests)
         .set({ status: 'responded', updatedAt: now })
         .where(eq(quoteRequests.id, proposal.quoteRequestId)),
+      db.insert(notifications).values({
+        id: crypto.randomUUID(),
+        userId: quote.buyerId,
+        type: 'proposal_sent',
+        title: 'New proposal',
+        body: 'A contractor sent a proposal for your request.',
+        payloadJson: JSON.stringify({ proposalId: proposal.id, quoteId: quote.id }),
+        createdAt: now,
+      }),
     ])
     await writeAudit(c, {
       action: 'proposal.sent',
@@ -1313,6 +1476,12 @@ app.post('/proposals/:id/accept', async (c) => {
   if (!quote) throw new HttpError(403, 'proposal_access_denied', 'You cannot accept this proposal.')
   if (!canTransitionProposal(proposal.status, 'accepted'))
     throw new HttpError(409, 'invalid_transition', 'This proposal can no longer be accepted.')
+  if (
+    proposal.companyId !== quote.companyId ||
+    ['declined', 'expired', 'converted'].includes(quote.status)
+  ) {
+    throw new HttpError(409, 'quote_not_open', 'This quote request can no longer be accepted.')
+  }
   const [thread] = await db
     .select()
     .from(messageThreads)
@@ -1375,6 +1544,53 @@ app.post('/proposals/:id/accept', async (c) => {
     { data: { jobId, status: 'accepted' }, meta: { requestId: c.get('requestId') } },
     201,
   )
+})
+
+app.post('/proposals/:id/decline', async (c) => {
+  const actor = requireActor(c)
+  const proposalId = uuidSchema.parse(c.req.param('id'))
+  const db = drizzle(c.env.DB)
+  const [proposal] = await db.select().from(proposals).where(eq(proposals.id, proposalId)).limit(1)
+  if (!proposal) throw new HttpError(404, 'proposal_not_found', 'Proposal not found.')
+  const [quote] = await db
+    .select()
+    .from(quoteRequests)
+    .where(and(eq(quoteRequests.id, proposal.quoteRequestId), eq(quoteRequests.buyerId, actor.id)))
+    .limit(1)
+  if (!quote)
+    throw new HttpError(403, 'proposal_access_denied', 'You cannot decline this proposal.')
+  if (!canTransitionProposal(proposal.status, 'declined'))
+    throw new HttpError(409, 'invalid_transition', 'This proposal can no longer be declined.')
+  if (proposal.companyId !== quote.companyId || quote.status === 'converted') {
+    throw new HttpError(409, 'quote_not_open', 'This quote request can no longer be declined.')
+  }
+  const now = new Date().toISOString()
+  await db.batch([
+    db
+      .update(proposals)
+      .set({ status: 'declined', respondedAt: now, updatedAt: now })
+      .where(eq(proposals.id, proposal.id)),
+    db
+      .update(quoteRequests)
+      .set({ status: 'declined', updatedAt: now })
+      .where(eq(quoteRequests.id, quote.id)),
+    db.insert(notifications).values({
+      id: crypto.randomUUID(),
+      userId: proposal.createdBy,
+      type: 'proposal_declined',
+      title: 'Proposal declined',
+      body: `${quote.name} declined your proposal.`,
+      payloadJson: JSON.stringify({ proposalId: proposal.id, quoteId: quote.id }),
+      createdAt: now,
+    }),
+  ])
+  await writeAudit(c, {
+    action: 'proposal.declined',
+    targetType: 'proposal',
+    targetId: proposal.id,
+    companyId: quote.companyId,
+  })
+  return ok(c, { id: proposal.id, status: 'declined', quoteStatus: 'declined' })
 })
 
 app.get('/threads', async (c) => {

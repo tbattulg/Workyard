@@ -1,8 +1,9 @@
 import type { InvoiceStatus, JobStatus, ProposalStatus, QuoteStatus } from './domain'
 
 const QUOTE_TRANSITIONS: Record<QuoteStatus, readonly QuoteStatus[]> = {
-  new: ['viewed', 'responded', 'declined', 'expired'],
-  viewed: ['responded', 'declined', 'expired'],
+  new: ['viewed', 'ready_for_proposal', 'responded', 'declined', 'expired'],
+  viewed: ['ready_for_proposal', 'responded', 'declined', 'expired'],
+  ready_for_proposal: ['responded', 'declined', 'expired'],
   responded: ['accepted', 'declined', 'expired'],
   accepted: ['converted'],
   declined: [],

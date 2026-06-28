@@ -45,6 +45,7 @@ export const quoteRequestSchema = z
     projectCity: z.string().trim().min(2).max(80),
     projectState: stateCodeSchema,
     projectZip: z.string().regex(/^\d{5}$/),
+    projectType: z.string().trim().min(3).max(120),
     jobDescription: z.string().trim().min(20).max(5000),
     preferredStartDate: z.string().date().optional(),
     budgetMinCents: z.number().int().nonnegative().optional(),
@@ -64,23 +65,67 @@ export const quoteRequestSchema = z
     }
   })
 
-export const proposalSchema = z.object({
-  quoteRequestId: uuidSchema,
-  title: z.string().trim().min(3).max(160),
-  summary: z.string().trim().min(20).max(5000),
-  validUntil: z.string().date().optional(),
-  items: z
-    .array(
-      z.object({
-        description: z.string().trim().min(2).max(500),
-        quantityMilli: z.number().int().positive(),
-        unitPriceCents: z.number().int().nonnegative(),
-        itemType: z.enum(['labor', 'material', 'equipment', 'fee', 'change_order']),
-      }),
-    )
-    .min(1)
-    .max(100),
-})
+export const proposalSchema = z
+  .object({
+    quoteRequestId: uuidSchema,
+    title: z.string().trim().min(3).max(160),
+    summary: z.string().trim().min(20).max(5000),
+    priceType: z.enum(['fixed', 'range']).default('fixed'),
+    priceMinCents: z.number().int().nonnegative().optional(),
+    priceMaxCents: z.number().int().nonnegative().optional(),
+    assumptions: z.string().trim().max(2000).optional(),
+    validUntil: z.string().date().optional(),
+    notes: z.string().trim().max(2000).optional(),
+    items: z
+      .array(
+        z.object({
+          description: z.string().trim().min(2).max(500),
+          quantityMilli: z.number().int().positive(),
+          unitPriceCents: z.number().int().nonnegative(),
+          itemType: z.enum(['labor', 'material', 'equipment', 'fee', 'change_order']),
+        }),
+      )
+      .min(1)
+      .max(100)
+      .optional(),
+  })
+  .superRefine((value, context) => {
+    const hasItems = Boolean(value.items?.length)
+    if (value.priceType === 'fixed' && value.priceMaxCents === undefined && !hasItems) {
+      context.addIssue({
+        code: 'custom',
+        path: ['priceMaxCents'],
+        message: 'Add a fixed estimate or at least one proposal item.',
+      })
+    }
+    if (value.priceType === 'range') {
+      if (value.priceMinCents === undefined) {
+        context.addIssue({
+          code: 'custom',
+          path: ['priceMinCents'],
+          message: 'Add the low end of the price range.',
+        })
+      }
+      if (value.priceMaxCents === undefined) {
+        context.addIssue({
+          code: 'custom',
+          path: ['priceMaxCents'],
+          message: 'Add the high end of the price range.',
+        })
+      }
+    }
+    if (
+      value.priceMinCents !== undefined &&
+      value.priceMaxCents !== undefined &&
+      value.priceMinCents > value.priceMaxCents
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['priceMaxCents'],
+        message: 'Maximum estimate must be greater than or equal to minimum estimate.',
+      })
+    }
+  })
 
 export const messageSchema = z.object({
   body: z.string().trim().min(1).max(5000),

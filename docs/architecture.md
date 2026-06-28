@@ -9,7 +9,7 @@ The current application scope uses one D1 database per environment. File storage
 ## Domain lifecycle
 
 - Company: `draft`, `pending`, `verified`, `rejected`, `suspended`
-- Quote: `new`, `viewed`, `responded`, `accepted`, `declined`, `expired`, `converted`
+- Quote: `new`, `viewed`, `ready_for_proposal`, `responded`, `accepted`, `declined`, `expired`, `converted`
 - Proposal: `draft`, `sent`, `accepted`, `declined`, `expired`, `withdrawn`
 - Job: `accepted`, `scheduled`, `in_progress`, `awaiting_invoice`, `invoiced`, `paid`, `closed`, `cancelled`
 - Invoice: `draft`, `sent`, `viewed`, `overdue`, `paid`, `void`
@@ -31,3 +31,14 @@ Money is stored as integer cents. Tax, discount, and retainage rates use basis p
 Clerk is the identity provider. D1 stores the local user profile, platform role, company memberships, assignments, and suspension state. A user may be a buyer and also belong to one or more companies.
 
 Platform administrators can moderate across tenants. Company administrators manage their company. Staff can access assigned work and company conversations but cannot send invoices.
+
+## Lead flow
+
+Buyers submit quote requests to verified companies and optional active services with contact
+details, project address, project type, scope, preferred timing, and optional budget. Contractor
+inbox actions move leads through viewed, ready-for-proposal, declined, and responded states.
+
+Contractors send lightweight proposals with a scope summary, fixed estimate or price range,
+assumptions, expiration date, and notes. Buyer acceptance marks the proposal accepted, converts the
+quote into job-ready state, and creates the accepted job record. Buyer decline closes the proposal
+and quote without payments, checkout, PDF generation, uploads, bid blasting, or accounting sync.

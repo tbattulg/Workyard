@@ -188,6 +188,7 @@ export const quoteRequests = sqliteTable(
     projectCity: text('project_city').notNull(),
     projectState: text('project_state').notNull(),
     projectZip: text('project_zip').notNull(),
+    projectType: text('project_type').notNull().default('General project'),
     normalizedAddress: text('normalized_address'),
     latitudeE6: integer('latitude_e6'),
     longitudeE6: integer('longitude_e6'),
@@ -303,7 +304,14 @@ export const proposals = sqliteTable(
     title: text('title').notNull(),
     summary: text('summary').notNull(),
     subtotalCents: integer('subtotal_cents').notNull(),
+    priceType: text('price_type', { enum: ['fixed', 'range'] })
+      .notNull()
+      .default('fixed'),
+    priceMinCents: integer('price_min_cents'),
+    priceMaxCents: integer('price_max_cents'),
+    assumptions: text('assumptions'),
     validUntil: text('valid_until'),
+    notes: text('notes'),
     status: text('status', { enum: PROPOSAL_STATUSES }).notNull().default('draft'),
     sentAt: text('sent_at'),
     respondedAt: text('responded_at'),

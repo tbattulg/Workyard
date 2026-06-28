@@ -8,7 +8,8 @@ import {
 
 describe('workflow transitions', () => {
   it('allows the expected quote and proposal path', () => {
-    expect(canTransitionQuote('new', 'responded')).toBe(true)
+    expect(canTransitionQuote('new', 'ready_for_proposal')).toBe(true)
+    expect(canTransitionQuote('ready_for_proposal', 'responded')).toBe(true)
     expect(canTransitionQuote('accepted', 'converted')).toBe(true)
     expect(canTransitionProposal('draft', 'sent')).toBe(true)
     expect(canTransitionProposal('sent', 'accepted')).toBe(true)

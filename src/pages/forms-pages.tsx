@@ -6,6 +6,7 @@ import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form'
 import { useSearchParams } from 'react-router-dom'
 import { z } from 'zod'
 import { calculateInvoiceTotals, formatMoney } from '../../shared/money'
+import { US_STATES } from '../../shared/us-states'
 import { invoiceSchema, supportRequestSchema } from '../../shared/validation'
 import { Button, Card, Field, SecondaryButton } from '../components/ui'
 import { apiRequest } from '../lib/api'
@@ -23,6 +24,7 @@ const quoteFormSchema = z.object({
     .length(2)
     .transform((value) => value.toUpperCase()),
   projectZip: z.string().regex(/^\d{5}$/),
+  projectType: z.string().trim().min(3).max(120),
   jobDescription: z.string().trim().min(20).max(5000),
   preferredStartDate: z.union([z.string().date(), z.literal('')]).optional(),
   budget: z.string().optional(),
@@ -75,13 +77,15 @@ function QuoteRequestForm({ getAuthToken }: { getAuthToken?: () => Promise<strin
   const [params] = useSearchParams()
   const [sent, setSent] = useState<'live' | 'demo' | 'failed' | false>(false)
   const companyId = params.get('company') ?? '11111111-1111-4111-8111-111111111111'
+  const serviceId = params.get('service')
+  const serviceName = params.get('serviceName')
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<QuoteForm>({
     resolver: zodResolver(quoteFormSchema),
-    defaultValues: { projectCity: '', projectState: '' },
+    defaultValues: { projectCity: '', projectState: '', projectType: serviceName ?? '' },
   })
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -95,16 +99,26 @@ function QuoteRequestForm({ getAuthToken }: { getAuthToken?: () => Promise<strin
         projectCity: values.projectCity,
         projectState: values.projectState,
         projectZip: values.projectZip,
+        projectType: values.projectType,
         jobDescription: values.jobDescription,
         preferredStartDate: values.preferredStartDate || undefined,
       }
       try {
         const authToken = await getAuthToken?.()
-        await apiRequest('/quotes', {
-          method: 'POST',
-          headers: { 'Idempotency-Key': crypto.randomUUID() },
-          body: JSON.stringify({ ...payload, ...budget, companyId }),
-        }, { authToken })
+        await apiRequest(
+          '/quotes',
+          {
+            method: 'POST',
+            headers: { 'Idempotency-Key': crypto.randomUUID() },
+            body: JSON.stringify({
+              ...payload,
+              ...budget,
+              companyId,
+              serviceId: serviceId || undefined,
+            }),
+          },
+          { authToken },
+        )
         setSent('live')
       } catch {
         setSent(getAuthToken ? 'failed' : 'demo')
@@ -117,7 +131,7 @@ function QuoteRequestForm({ getAuthToken }: { getAuthToken?: () => Promise<strin
       <div className="mx-auto max-w-2xl px-4 py-20">
         <Card className="p-10 text-center">
           <CheckCircle2 className="mx-auto text-emerald-600" size={54} />
-          <h1 className="mt-5 text-3xl font-black">Your request is ready</h1>
+          <h1 className="mt-5 text-3xl font-black">Your request was sent</h1>
           <p className="mt-3 text-slate-600">
             {sent === 'live'
               ? 'The contractor can now review the request in their lead inbox.'
@@ -138,6 +152,11 @@ function QuoteRequestForm({ getAuthToken }: { getAuthToken?: () => Promise<strin
         <p className="mt-3 text-lg text-slate-600">
           Include enough detail for an informed first response. No payment is collected.
         </p>
+        {serviceName ? (
+          <p className="mt-3 inline-flex rounded-lg bg-amber-100 px-3 py-2 text-sm font-bold text-amber-950">
+            Selected service: {serviceName}
+          </p>
+        ) : null}
       </div>
 
       <form className="mt-8 grid gap-6" onSubmit={submit}>
@@ -179,7 +198,14 @@ function QuoteRequestForm({ getAuthToken }: { getAuthToken?: () => Promise<strin
             <input id="city" className="input" {...register('projectCity')} />
           </Field>
           <Field id="state" label="State">
-            <input id="state" className="input" maxLength={2} {...register('projectState')} />
+            <select id="state" className="input" {...register('projectState')}>
+              <option value="">Select state</option>
+              {US_STATES.map((state) => (
+                <option key={state.code} value={state.code}>
+                  {state.name}
+                </option>
+              ))}
+            </select>
           </Field>
           <Field id="zip" label="ZIP code">
             <input id="zip" className="input" inputMode="numeric" {...register('projectZip')} />
@@ -188,6 +214,14 @@ function QuoteRequestForm({ getAuthToken }: { getAuthToken?: () => Promise<strin
 
         <Card className="grid gap-5 p-6">
           <h2 className="text-xl font-black">Scope and timing</h2>
+          <Field id="project-type" label="Project type">
+            <input
+              id="project-type"
+              className="input"
+              {...register('projectType')}
+              aria-invalid={Boolean(errors.projectType)}
+            />
+          </Field>
           <Field
             id="description"
             label="Describe the work"
