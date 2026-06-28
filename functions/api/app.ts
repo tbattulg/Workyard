@@ -37,7 +37,7 @@ import {
   threadParticipants,
   users,
 } from '../../shared/db/schema'
-import type { CompanySummary } from '../../shared/domain'
+import type { CompanyStatus, CompanySummary } from '../../shared/domain'
 import { calculateInvoiceTotals } from '../../shared/money'
 import {
   companySearchSchema,
@@ -171,6 +171,32 @@ const companyInputSchema = z.object({
 
 const STATEWIDE_SERVICE_AREA_CITY = 'Statewide'
 
+const serviceStatesInputSchema = z
+  .array(stateCodeSchema)
+  .min(1)
+  .max(50)
+  .transform((states) => [...new Set(states)])
+
+const serviceCategoryIdsSchema = z
+  .array(uuidSchema)
+  .min(1)
+  .max(12)
+  .transform((categoryIds) => [...new Set(categoryIds)])
+
+const companyCreateSchema = companyInputSchema.extend({
+  serviceCategoryIds: serviceCategoryIdsSchema,
+  serviceStates: serviceStatesInputSchema.optional(),
+})
+
+const companyOnboardingPatchSchema = companyInputSchema.partial().extend({
+  serviceCategoryIds: serviceCategoryIdsSchema.optional(),
+  serviceStates: serviceStatesInputSchema.optional(),
+})
+
+const adminReviewActionSchema = z.object({
+  reason: z.string().trim().min(10).max(1000),
+})
+
 const serviceInputSchema = z.object({
   companyId: uuidSchema,
   categoryId: uuidSchema,
@@ -192,6 +218,60 @@ function slugify(value: string) {
     .replace(/^-|-$/g, '')
     .slice(0, 100)
 }
+
+function serviceDescription(company: { name: string; description: string }, categoryName: string) {
+  return `${company.name} offers ${categoryName.toLowerCase()} services. ${company.description}`.slice(
+    0,
+    5000,
+  )
+}
+
+function nextEditableStatus(status: CompanyStatus): CompanyStatus {
+  if (status === 'verified') return 'pending'
+  if (status === 'rejected') return 'draft'
+  return status
+}
+
+async function loadActiveServiceCategories(db: ReturnType<typeof drizzle>, categoryIds: string[]) {
+  const categories = await db
+    .select({
+      id: serviceCategories.id,
+      name: serviceCategories.name,
+      slug: serviceCategories.slug,
+    })
+    .from(serviceCategories)
+    .where(and(inArray(serviceCategories.id, categoryIds), eq(serviceCategories.active, true)))
+
+  if (categories.length !== categoryIds.length) {
+    throw new HttpError(
+      422,
+      'invalid_service_categories',
+      'Choose one or more active service categories.',
+    )
+  }
+
+  const sortOrder = new Map(categoryIds.map((id, index) => [id, index]))
+  return categories.sort(
+    (left, right) => (sortOrder.get(left.id) ?? 0) - (sortOrder.get(right.id) ?? 0),
+  )
+}
+
+app.get('/service-categories', async (c) => {
+  const db = drizzle(c.env.DB)
+  return ok(
+    c,
+    await db
+      .select({
+        id: serviceCategories.id,
+        name: serviceCategories.name,
+        slug: serviceCategories.slug,
+        description: serviceCategories.description,
+      })
+      .from(serviceCategories)
+      .where(eq(serviceCategories.active, true))
+      .orderBy(serviceCategories.sortOrder, serviceCategories.name),
+  )
+})
 
 app.get('/companies', async (c) => {
   const parsed = companySearchSchema.safeParse(c.req.query())
@@ -363,7 +443,7 @@ app.get('/me', async (c) => {
 
 app.post('/companies', async (c) => {
   const actor = requireActor(c)
-  const parsed = companyInputSchema.safeParse(await c.req.json())
+  const parsed = companyCreateSchema.safeParse(await c.req.json())
   if (!parsed.success)
     throw new HttpError(
       422,
@@ -372,14 +452,42 @@ app.post('/companies', async (c) => {
       validationFields(parsed.error),
     )
   const db = drizzle(c.env.DB)
+  const categoryRows = await loadActiveServiceCategories(db, parsed.data.serviceCategoryIds)
   const now = new Date().toISOString()
   const companyId = crypto.randomUUID()
   const slug = `${slugify(parsed.data.name)}-${companyId.slice(0, 8)}`
+  const selectedStates = parsed.data.serviceStates ?? [parsed.data.state]
+  const companyData = companyInputSchema.parse(parsed.data)
+  const serviceAreaValues = selectedStates.map((state) => ({
+    id: crypto.randomUUID(),
+    companyId,
+    city: state === companyData.state ? companyData.city : STATEWIDE_SERVICE_AREA_CITY,
+    state,
+    zip: state === companyData.state ? companyData.zip : null,
+    radiusMiles: state === companyData.state ? companyData.serviceRadiusMiles : null,
+    createdAt: now,
+  }))
+  const serviceValues = categoryRows.map((category) => {
+    const serviceId = crypto.randomUUID()
+    return {
+      id: serviceId,
+      companyId,
+      categoryId: category.id,
+      title: `${category.name} services`,
+      slug: `${slugify(category.name)}-${serviceId.slice(0, 8)}`,
+      description: serviceDescription(companyData, category.name),
+      pricingType: 'quote' as const,
+      startingPriceCents: null,
+      active: true,
+      createdAt: now,
+      updatedAt: now,
+    }
+  })
   await db.batch([
     db.insert(companies).values({
       id: companyId,
       slug,
-      ...parsed.data,
+      ...companyData,
       status: 'draft',
       createdAt: now,
       updatedAt: now,
@@ -392,24 +500,27 @@ app.post('/companies', async (c) => {
       createdAt: now,
       updatedAt: now,
     }),
-    db.insert(companyServiceAreas).values({
-      id: crypto.randomUUID(),
-      companyId,
-      city: parsed.data.city,
-      state: parsed.data.state,
-      zip: parsed.data.zip,
-      radiusMiles: parsed.data.serviceRadiusMiles,
-      createdAt: now,
-    }),
+    db.insert(companyServiceAreas).values(serviceAreaValues),
+    db.insert(services).values(serviceValues),
   ])
   await writeAudit(c, {
     action: 'company.created',
     targetType: 'company',
     targetId: companyId,
     companyId,
+    details: { categoryCount: serviceValues.length, serviceStateCount: selectedStates.length },
   })
   return c.json(
-    { data: { id: companyId, slug, status: 'draft' }, meta: { requestId: c.get('requestId') } },
+    {
+      data: {
+        id: companyId,
+        slug,
+        status: 'draft',
+        serviceCategoryIds: categoryRows.map((category) => category.id),
+        serviceStates: selectedStates,
+      },
+      meta: { requestId: c.get('requestId') },
+    },
     201,
   )
 })
@@ -428,8 +539,10 @@ app.patch('/companies/:id', async (c) => {
   const db = drizzle(c.env.DB)
   const [company] = await db.select().from(companies).where(eq(companies.id, companyId)).limit(1)
   if (!company) throw new HttpError(404, 'company_not_found', 'Company not found.')
+  if (company.status === 'suspended')
+    throw new HttpError(409, 'company_suspended', 'Suspended companies cannot be edited.')
   const now = new Date().toISOString()
-  const status = company.status === 'verified' ? 'pending' : company.status
+  const status = nextEditableStatus(company.status)
   await db
     .update(companies)
     .set({ ...parsed.data, status, updatedAt: now })
@@ -442,6 +555,161 @@ app.patch('/companies/:id', async (c) => {
     details: { actorId: actor.id, requiresReview: company.status === 'verified' },
   })
   return ok(c, { id: companyId, status })
+})
+
+app.get('/companies/:id/onboarding', async (c) => {
+  const companyId = uuidSchema.parse(c.req.param('id'))
+  await requireCompanyMember(c, companyId, ['company_admin'])
+  const db = drizzle(c.env.DB)
+  const [company] = await db.select().from(companies).where(eq(companies.id, companyId)).limit(1)
+  if (!company) throw new HttpError(404, 'company_not_found', 'Company not found.')
+  const serviceStateRows = await db
+    .select({ state: companyServiceAreas.state })
+    .from(companyServiceAreas)
+    .where(eq(companyServiceAreas.companyId, companyId))
+    .orderBy(companyServiceAreas.state)
+  const categoryRows = await db
+    .select({
+      id: serviceCategories.id,
+      name: serviceCategories.name,
+      slug: serviceCategories.slug,
+    })
+    .from(services)
+    .innerJoin(serviceCategories, eq(serviceCategories.id, services.categoryId))
+    .where(and(eq(services.companyId, companyId), eq(services.active, true)))
+    .orderBy(serviceCategories.sortOrder, serviceCategories.name)
+  return ok(c, {
+    ...company,
+    serviceStates: [...new Set(serviceStateRows.map((row) => row.state))],
+    serviceCategoryIds: categoryRows.map((row) => row.id),
+    categories: categoryRows.map((row) => row.name),
+  })
+})
+
+app.patch('/companies/:id/onboarding', async (c) => {
+  const companyId = uuidSchema.parse(c.req.param('id'))
+  const { actor } = await requireCompanyMember(c, companyId, ['company_admin'])
+  const parsed = companyOnboardingPatchSchema.safeParse(await c.req.json())
+  if (!parsed.success)
+    throw new HttpError(
+      422,
+      'invalid_company',
+      'Review the company profile.',
+      validationFields(parsed.error),
+    )
+  const db = drizzle(c.env.DB)
+  const [company] = await db.select().from(companies).where(eq(companies.id, companyId)).limit(1)
+  if (!company) throw new HttpError(404, 'company_not_found', 'Company not found.')
+  if (company.status === 'suspended')
+    throw new HttpError(409, 'company_suspended', 'Suspended companies cannot be edited.')
+
+  const now = new Date().toISOString()
+  const { serviceCategoryIds, serviceStates, ...profilePatch } = parsed.data
+  const nextCompany = { ...company, ...profilePatch }
+  const status = nextEditableStatus(company.status)
+  const operations: unknown[] = [
+    db
+      .update(companies)
+      .set({ ...profilePatch, status, updatedAt: now })
+      .where(eq(companies.id, companyId)),
+  ]
+
+  if (serviceStates) {
+    operations.push(
+      db
+        .delete(companyServiceAreas)
+        .where(
+          and(
+            eq(companyServiceAreas.companyId, companyId),
+            notInArray(companyServiceAreas.state, serviceStates),
+          ),
+        ),
+    )
+    const existingAreas = await db
+      .select({ state: companyServiceAreas.state })
+      .from(companyServiceAreas)
+      .where(eq(companyServiceAreas.companyId, companyId))
+    const existingStates = new Set(existingAreas.map((area) => area.state))
+    for (const state of serviceStates.filter((state) => !existingStates.has(state))) {
+      operations.push(
+        db.insert(companyServiceAreas).values({
+          id: crypto.randomUUID(),
+          companyId,
+          city: state === nextCompany.state ? nextCompany.city : STATEWIDE_SERVICE_AREA_CITY,
+          state,
+          zip: state === nextCompany.state ? nextCompany.zip : null,
+          radiusMiles: state === nextCompany.state ? nextCompany.serviceRadiusMiles : null,
+          createdAt: now,
+        }),
+      )
+    }
+  }
+
+  if (serviceCategoryIds) {
+    const categoryRows = await loadActiveServiceCategories(db, serviceCategoryIds)
+    const existingServices = await db
+      .select({ id: services.id, categoryId: services.categoryId })
+      .from(services)
+      .where(eq(services.companyId, companyId))
+    const selectedCategoryIds = new Set(serviceCategoryIds)
+    const existingCategoryIds = new Set(existingServices.map((service) => service.categoryId))
+    if (existingServices.length > 0) {
+      operations.push(
+        db
+          .update(services)
+          .set({ active: false, updatedAt: now })
+          .where(eq(services.companyId, companyId)),
+      )
+    }
+    for (const service of existingServices.filter((item) =>
+      selectedCategoryIds.has(item.categoryId),
+    )) {
+      operations.push(
+        db
+          .update(services)
+          .set({ active: true, updatedAt: now })
+          .where(eq(services.id, service.id)),
+      )
+    }
+    for (const category of categoryRows.filter((item) => !existingCategoryIds.has(item.id))) {
+      const serviceId = crypto.randomUUID()
+      operations.push(
+        db.insert(services).values({
+          id: serviceId,
+          companyId,
+          categoryId: category.id,
+          title: `${category.name} services`,
+          slug: `${slugify(category.name)}-${serviceId.slice(0, 8)}`,
+          description: serviceDescription(nextCompany, category.name),
+          pricingType: 'quote' as const,
+          startingPriceCents: null,
+          active: true,
+          createdAt: now,
+          updatedAt: now,
+        }),
+      )
+    }
+  }
+
+  await db.batch(operations as unknown as Parameters<typeof db.batch>[0])
+  await writeAudit(c, {
+    action: 'company.onboarding_updated',
+    targetType: 'company',
+    targetId: companyId,
+    companyId,
+    details: {
+      actorId: actor.id,
+      requiresReview: company.status === 'verified',
+      serviceCategoryCount: serviceCategoryIds?.length ?? null,
+      serviceStateCount: serviceStates?.length ?? null,
+    },
+  })
+  return ok(c, {
+    id: companyId,
+    status,
+    serviceCategoryIds: serviceCategoryIds ?? undefined,
+    serviceStates: serviceStates ?? undefined,
+  })
 })
 
 app.get('/companies/:id/service-states', async (c) => {
@@ -473,6 +741,8 @@ app.put('/companies/:id/service-states', async (c) => {
   const db = drizzle(c.env.DB)
   const [company] = await db.select().from(companies).where(eq(companies.id, companyId)).limit(1)
   if (!company) throw new HttpError(404, 'company_not_found', 'Company not found.')
+  if (company.status === 'suspended')
+    throw new HttpError(409, 'company_suspended', 'Suspended companies cannot be edited.')
   const existingAreas = await db
     .select({ state: companyServiceAreas.state })
     .from(companyServiceAreas)
@@ -481,7 +751,7 @@ app.put('/companies/:id/service-states', async (c) => {
   const selectedStates = parsed.data.states
   const existingStates = new Set(existingAreas.map((area) => area.state))
   const missingStates = selectedStates.filter((state) => !existingStates.has(state))
-  const status = company.status === 'verified' ? 'pending' : company.status
+  const status = nextEditableStatus(company.status)
   await db.batch([
     db
       .delete(companyServiceAreas)
@@ -563,20 +833,39 @@ app.post('/companies/:id/verification-documents', async (c) => {
 
 app.post('/companies/:id/submit-verification', async (c) => {
   const companyId = uuidSchema.parse(c.req.param('id'))
-  await requireCompanyMember(c, companyId, ['company_admin'])
+  const { actor } = await requireCompanyMember(c, companyId, ['company_admin'])
   const db = drizzle(c.env.DB)
   const [company] = await db.select().from(companies).where(eq(companies.id, companyId)).limit(1)
   if (!company) throw new HttpError(404, 'company_not_found', 'Company not found.')
-  const [document] = await db
-    .select({ id: companyVerificationDocuments.id })
-    .from(companyVerificationDocuments)
-    .where(eq(companyVerificationDocuments.companyId, companyId))
+  if (company.status === 'suspended')
+    throw new HttpError(409, 'company_suspended', 'Suspended companies cannot be submitted.')
+  const serviceAreaRows = await db
+    .select({ state: companyServiceAreas.state })
+    .from(companyServiceAreas)
+    .where(eq(companyServiceAreas.companyId, companyId))
     .limit(1)
-  if (!document || !company.licenseNumber)
+  const serviceRows = await db
+    .select({ id: services.id })
+    .from(services)
+    .where(and(eq(services.companyId, companyId), eq(services.active, true)))
+    .limit(1)
+  const missingFields = [
+    company.name ? null : 'name',
+    company.description ? null : 'description',
+    company.email ? null : 'email',
+    company.phone ? null : 'phone',
+    company.city ? null : 'city',
+    company.state ? null : 'state',
+    company.licenseNumber ? null : 'licenseNumber',
+    serviceAreaRows.length > 0 ? null : 'serviceStates',
+    serviceRows.length > 0 ? null : 'serviceCategoryIds',
+  ].filter((field): field is string => Boolean(field))
+  if (missingFields.length > 0)
     throw new HttpError(
       409,
       'verification_incomplete',
-      'Add a license number and at least one verification document.',
+      'Complete the business profile, license number, service categories, and service states.',
+      { profile: missingFields },
     )
   const now = new Date().toISOString()
   await db
@@ -588,6 +877,7 @@ app.post('/companies/:id/submit-verification', async (c) => {
     targetType: 'company',
     targetId: companyId,
     companyId,
+    details: { actorId: actor.id },
   })
   return ok(c, { id: companyId, status: 'pending' })
 })
@@ -2213,7 +2503,7 @@ app.post('/admin/companies/:id/approve', async (c) => {
   const now = new Date().toISOString()
   const result = await db
     .update(companies)
-    .set({ status: 'verified', verifiedAt: now, updatedAt: now })
+    .set({ status: 'verified', verifiedAt: now, suspendedAt: null, updatedAt: now })
     .where(and(eq(companies.id, companyId), eq(companies.status, 'pending')))
     .returning({ id: companies.id })
   if (!result[0])
@@ -2228,10 +2518,47 @@ app.post('/admin/companies/:id/approve', async (c) => {
   return ok(c, { id: companyId, status: 'verified' })
 })
 
+app.post('/admin/companies/:id/reject', async (c) => {
+  const actor = requirePlatformRole(c, ['platform_admin'])
+  const companyId = uuidSchema.parse(c.req.param('id'))
+  const parsed = adminReviewActionSchema.safeParse(await c.req.json())
+  if (!parsed.success)
+    throw new HttpError(
+      422,
+      'invalid_review_action',
+      'Add a note explaining what needs to change.',
+      validationFields(parsed.error),
+    )
+  const db = drizzle(c.env.DB)
+  const now = new Date().toISOString()
+  const result = await db
+    .update(companies)
+    .set({ status: 'rejected', updatedAt: now })
+    .where(and(eq(companies.id, companyId), eq(companies.status, 'pending')))
+    .returning({ id: companies.id })
+  if (!result[0])
+    throw new HttpError(409, 'company_not_pending', 'Only pending companies can be returned.')
+  await writeAudit(c, {
+    action: 'company.changes_requested',
+    targetType: 'company',
+    targetId: companyId,
+    companyId,
+    details: { adminId: actor.id, reason: parsed.data.reason },
+  })
+  return ok(c, { id: companyId, status: 'rejected' })
+})
+
 app.post('/admin/companies/:id/suspend', async (c) => {
   const actor = requirePlatformRole(c, ['platform_admin'])
   const companyId = uuidSchema.parse(c.req.param('id'))
-  const reason = z.object({ reason: z.string().trim().min(10).max(1000) }).parse(await c.req.json())
+  const parsed = adminReviewActionSchema.safeParse(await c.req.json())
+  if (!parsed.success)
+    throw new HttpError(
+      422,
+      'invalid_review_action',
+      'Add a suspension reason.',
+      validationFields(parsed.error),
+    )
   const db = drizzle(c.env.DB)
   const now = new Date().toISOString()
   await db
@@ -2243,7 +2570,7 @@ app.post('/admin/companies/:id/suspend', async (c) => {
     targetType: 'company',
     targetId: companyId,
     companyId,
-    details: { adminId: actor.id, reason: reason.reason },
+    details: { adminId: actor.id, reason: parsed.data.reason },
   })
   return ok(c, { id: companyId, status: 'suspended' })
 })

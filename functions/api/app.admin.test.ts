@@ -214,6 +214,35 @@ describe('admin moderation routes', () => {
     expect(mocks.inserts).toHaveLength(0)
   })
 
+  it('requests changes on pending companies and writes an audit event', async () => {
+    mockAuthenticatedClerkUser()
+    mocks.selectResults = [[userRecord()]]
+    mocks.updateResults = [[{ id: '11111111-1111-4111-8111-111111111111' }]]
+
+    const response = await app.request(
+      '/api/v1/admin/companies/11111111-1111-4111-8111-111111111111/reject',
+      {
+        method: 'POST',
+        body: JSON.stringify({ reason: 'License details need a manual correction.' }),
+      },
+      env(),
+    )
+    const body = await readJson(response)
+
+    expect(response.status).toBe(200)
+    expect(body.data).toMatchObject({
+      id: '11111111-1111-4111-8111-111111111111',
+      status: 'rejected',
+    })
+    expect(mocks.updates[0]).toMatchObject({ status: 'rejected' })
+    expect(mocks.inserts[0]).toMatchObject({
+      actorId: 'admin_1',
+      action: 'company.changes_requested',
+      targetType: 'company',
+      targetId: '11111111-1111-4111-8111-111111111111',
+    })
+  })
+
   it('suspends companies with an audit reason', async () => {
     mockAuthenticatedClerkUser()
     mocks.selectResults = [[userRecord()]]

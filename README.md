@@ -4,6 +4,11 @@ Workyard is a U.S.-wide construction services marketplace. The public brand is c
 
 Workyard connects buyers with manually verified trade businesses, carries a project from quote request through proposal and job tracking, and produces itemized post-work invoices. It does not process payments.
 
+Contractor onboarding is D1-backed: company admins save a draft profile with business details,
+license number, service categories, and service states, then submit it for admin verification.
+Admins can approve, request changes, or suspend companies. Public marketplace results show only
+verified, non-suspended companies; demo contractors appear only when live search returns no matches.
+
 ## Stack
 
 - React, TypeScript, Vite, React Router, TanStack Query

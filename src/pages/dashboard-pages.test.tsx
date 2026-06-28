@@ -99,8 +99,32 @@ describe('CompanyDashboardPage service states', () => {
           ],
         })
       }
-      if (url === `/api/v1/companies/${liveCompanyId}/service-states`) {
-        return jsonResponse({ states: ['IL', 'WI'] })
+      if (url === '/api/v1/service-categories') {
+        return jsonResponse([
+          {
+            id: '10000000-0000-4000-8000-000000000001',
+            name: 'Electrical',
+            slug: 'electrical',
+          },
+        ])
+      }
+      if (url === `/api/v1/companies/${liveCompanyId}/onboarding`) {
+        return jsonResponse({
+          id: liveCompanyId,
+          name: 'Prairie & Stone Builders',
+          description: 'Licensed remodeling and finish carpentry for regional properties.',
+          licenseNumber: 'GC-22391',
+          website: 'https://example.com/prairie-stone',
+          phone: '303-555-0168',
+          email: 'hello@prairiestone.example',
+          city: 'Denver',
+          state: 'CO',
+          zip: '80202',
+          serviceRadiusMiles: 35,
+          status: 'verified',
+          serviceStates: ['IL', 'WI'],
+          serviceCategoryIds: ['10000000-0000-4000-8000-000000000001'],
+        })
       }
       return Promise.reject(new Error(`Unexpected request: ${url}`))
     })
@@ -108,22 +132,46 @@ describe('CompanyDashboardPage service states', () => {
     await renderCompanyDashboard('pk_test')
 
     expect(await screen.findByLabelText('Illinois (IL)')).toBeChecked()
-    const [, serviceStatesInit] = expectFetchCall(
+    const [, onboardingInit] = expectFetchCall(
       fetchMock,
-      `/api/v1/companies/${liveCompanyId}/service-states`,
+      `/api/v1/companies/${liveCompanyId}/onboarding`,
     )
 
-    expect(serviceStatesInit.headers).toMatchObject({
+    expect(onboardingInit.headers).toMatchObject({
       Authorization: 'Bearer live-session',
     })
-    expect(fetchUrls(fetchMock)).not.toContain(`/api/v1/companies/${demoCompanyId}/service-states`)
+    expect(fetchUrls(fetchMock)).not.toContain(`/api/v1/companies/${demoCompanyId}/onboarding`)
   })
 
   it('preserves the seeded demo company when Clerk is not configured', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = requestUrl(input)
-      if (url === `/api/v1/companies/${demoCompanyId}/service-states`) {
-        return jsonResponse({ states: ['IL', 'IN'] })
+      if (url === '/api/v1/service-categories') {
+        return jsonResponse([
+          {
+            id: '10000000-0000-4000-8000-000000000001',
+            name: 'Electrical',
+            slug: 'electrical',
+          },
+        ])
+      }
+      if (url === `/api/v1/companies/${demoCompanyId}/onboarding`) {
+        return jsonResponse({
+          id: demoCompanyId,
+          name: 'Lakefront Electric Co.',
+          description: 'Licensed residential and light-commercial electrical work.',
+          licenseNumber: 'ECC-10482',
+          website: 'https://example.com/lakefront-electric',
+          phone: '216-555-0118',
+          email: 'hello@lakefrontelectric.example',
+          city: 'Cleveland',
+          state: 'OH',
+          zip: '44114',
+          serviceRadiusMiles: 28,
+          status: 'verified',
+          serviceStates: ['IL', 'IN'],
+          serviceCategoryIds: ['10000000-0000-4000-8000-000000000001'],
+        })
       }
       return Promise.reject(new Error(`Unexpected request: ${url}`))
     })
@@ -133,7 +181,7 @@ describe('CompanyDashboardPage service states', () => {
     expect(await screen.findByLabelText('Indiana (IN)')).toBeChecked()
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
-        `/api/v1/companies/${demoCompanyId}/service-states`,
+        `/api/v1/companies/${demoCompanyId}/onboarding`,
         expect.objectContaining({
           headers: expect.objectContaining({
             'X-Demo-User': 'demo_contractor',

@@ -71,7 +71,7 @@ export function HomePage() {
               {[
                 'Project address and scope',
                 'Preferred timing and budget',
-                'Photos and supporting documents',
+                'Clear constraints and site details',
                 'One organized conversation',
               ].map((item) => (
                 <div key={item} className="flex items-center gap-3 rounded-xl bg-slate-800 p-4">
@@ -169,9 +169,8 @@ export function BrowsePage() {
     retry: false,
   })
   const liveCompanies = companiesQuery.data
-  const useDemoFallback =
-    companiesQuery.isError || (liveCompanies?.length === 0 && filteredDemo.length > 0)
-  const filtered = useDemoFallback ? filteredDemo : (liveCompanies ?? filteredDemo)
+  const useDemoFallback = liveCompanies?.length === 0 && filteredDemo.length > 0
+  const filtered = useDemoFallback ? filteredDemo : (liveCompanies ?? [])
   const emptyLocation = state ? stateNameForCode(state) : 'those filters'
   return (
     <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
@@ -248,7 +247,13 @@ export function BrowsePage() {
           Showing demo contractors for testing until live contractors are seeded.
         </p>
       ) : null}
-      {!companiesQuery.isLoading && filtered.length === 0 ? (
+      {companiesQuery.isError ? (
+        <Card className="mt-8 p-8 text-center" role="alert">
+          <h2 className="text-xl font-black">Search is temporarily unavailable</h2>
+          <p className="mt-2 text-slate-600">Please try again in a moment.</p>
+        </Card>
+      ) : null}
+      {!companiesQuery.isLoading && !companiesQuery.isError && filtered.length === 0 ? (
         <Card className="mt-8 p-10 text-center">
           <h2 className="text-xl font-black">No exact matches yet</h2>
           <p className="mt-2 text-slate-600">Try another service or state near {emptyLocation}.</p>
@@ -385,7 +390,7 @@ export function CompanyPage() {
                 'Address and project scope',
                 'Preferred start timing',
                 'Budget range, if known',
-                'Photos or documents',
+                'Important site constraints',
               ].map((item) => (
                 <li key={item} className="flex gap-2">
                   <CheckCircle2 className="shrink-0 text-emerald-600" size={18} /> {item}

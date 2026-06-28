@@ -8,12 +8,19 @@ The current application scope uses one D1 database per environment. File storage
 
 ## Domain lifecycle
 
+- Company: `draft`, `pending`, `verified`, `rejected`, `suspended`
 - Quote: `new`, `viewed`, `responded`, `accepted`, `declined`, `expired`, `converted`
 - Proposal: `draft`, `sent`, `accepted`, `declined`, `expired`, `withdrawn`
 - Job: `accepted`, `scheduled`, `in_progress`, `awaiting_invoice`, `invoiced`, `paid`, `closed`, `cancelled`
 - Invoice: `draft`, `sent`, `viewed`, `overdue`, `paid`, `void`
 
 Transitions are validated centrally and appended to history tables. Sent invoices are immutable; corrections create a revision.
+
+Contractors create or edit a structured company draft with business details, license number,
+service categories, and U.S. service states. Submitting the profile moves it to `pending` without
+requiring file uploads. Platform admins approve pending companies into public `verified` status,
+request changes by returning them to `rejected`, or suspend companies. Verification decisions are
+recorded in audit events. Public marketplace search only returns verified, non-deleted companies.
 
 ## Money and time
 

@@ -1,9 +1,12 @@
 import {
   ArrowUpRight,
+  BadgeCheck,
+  Ban,
+  Building2,
   CalendarDays,
   Clock3,
+  FilePenLine,
   LoaderCircle,
-  MapPin,
   MessageSquareText,
   MoreHorizontal,
   Plus,
@@ -11,6 +14,7 @@ import {
   Search,
   ShieldAlert,
   Star,
+  XCircle,
 } from 'lucide-react'
 import { useAuth } from '@clerk/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -21,15 +25,9 @@ import { formatMoney } from '../../shared/money'
 import { US_STATES } from '../../shared/us-states'
 import { apiRequest, ApiError } from '../lib/api'
 import { appConfig } from '../lib/config'
-import { Badge, Button, Card, SecondaryButton } from '../components/ui'
+import { Badge, Button, Card, Field, SecondaryButton } from '../components/ui'
 
 const DEMO_COMPANY_ID = '11111111-1111-4111-8111-111111111111'
-
-type ServiceStatesResponse = {
-  id?: string
-  states: string[]
-  status?: string
-}
 
 type CompanyMembership = {
   companyId: string
@@ -41,6 +39,71 @@ type CompanyMembership = {
 type MeResponse = {
   id: string
   memberships: CompanyMembership[]
+}
+
+type ServiceCategory = {
+  id: string
+  name: string
+  slug: string
+  description?: string | null
+}
+
+type CompanyOnboardingProfile = {
+  id: string
+  name: string
+  description: string
+  licenseNumber?: string | null
+  website?: string | null
+  phone: string
+  email: string
+  city: string
+  state: string
+  zip: string
+  serviceRadiusMiles: number
+  status: string
+  serviceStates: string[]
+  serviceCategoryIds: string[]
+  categories?: string[]
+  updatedAt?: string
+}
+
+type CompanyOnboardingDraft = {
+  name: string
+  description: string
+  licenseNumber: string
+  website: string
+  phone: string
+  email: string
+  city: string
+  state: string
+  zip: string
+  serviceRadiusMiles: number
+  serviceStates: string[]
+  serviceCategoryIds: string[]
+  status: string
+}
+
+type CompanyOnboardingSaveResponse = {
+  id: string
+  slug?: string
+  status: string
+  serviceStates?: string[]
+  serviceCategoryIds?: string[]
+}
+
+type AdminCompanySummary = {
+  id: string
+  name: string
+  description: string
+  licenseNumber?: string | null
+  website?: string | null
+  phone: string
+  email: string
+  city: string
+  state: string
+  status: string
+  createdAt?: string
+  updatedAt?: string
 }
 
 export function DashboardPage() {
@@ -143,7 +206,7 @@ export function CompanyDashboardPage() {
           </Card>
         ))}
       </div>
-      <CompanyServiceStatesPanel />
+      <CompanyOnboardingPanel />
       <Card className="mt-7 overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 p-5">
           <div>
@@ -225,21 +288,17 @@ export function CompanyDashboardPage() {
   )
 }
 
-function CompanyServiceStatesPanel() {
+function CompanyOnboardingPanel() {
   if (appConfig.clerkPublishableKey) {
-    return <AuthenticatedCompanyServiceStatesPanel />
+    return <AuthenticatedCompanyOnboardingPanel />
   }
 
   return (
-    <ServiceStatesPanel
-      companyId={DEMO_COMPANY_ID}
-      companyName="Lakefront Electric Co."
-      demoUser="demo_contractor"
-    />
+    <CompanyOnboardingWorkspace initialCompanyId={DEMO_COMPANY_ID} demoUser="demo_contractor" />
   )
 }
 
-function AuthenticatedCompanyServiceStatesPanel() {
+function AuthenticatedCompanyOnboardingPanel() {
   const { getToken, isLoaded } = useAuth()
   const authOptions = async () => ({
     authToken: await getToken(),
@@ -260,151 +319,450 @@ function AuthenticatedCompanyServiceStatesPanel() {
         : null
 
   if (!isLoaded || meQuery.isLoading) {
-    return <ServiceStatesStatusCard message="Loading service states." />
+    return <OnboardingStatusCard message="Loading company profile." />
   }
 
   if (errorMessage) {
-    return <ServiceStatesStatusCard message={errorMessage} tone="error" />
-  }
-
-  if (!companyMembership) {
-    return <ServiceStatesStatusCard message="Company admin access is required." tone="error" />
+    return <OnboardingStatusCard message={errorMessage} tone="error" />
   }
 
   return (
-    <ServiceStatesPanel
-      companyId={companyMembership.companyId}
-      companyName={companyMembership.companyName}
+    <CompanyOnboardingWorkspace
+      initialCompanyId={companyMembership?.companyId ?? null}
       getToken={getToken}
     />
   )
 }
 
-function ServiceStatesPanel({
-  companyId,
-  companyName = 'this company',
+function blankOnboardingDraft(): CompanyOnboardingDraft {
+  return {
+    name: '',
+    description: '',
+    licenseNumber: '',
+    website: '',
+    phone: '',
+    email: '',
+    city: '',
+    state: 'IL',
+    zip: '',
+    serviceRadiusMiles: 25,
+    serviceStates: [],
+    serviceCategoryIds: [],
+    status: 'draft',
+  }
+}
+
+function profileToDraft(profile: CompanyOnboardingProfile): CompanyOnboardingDraft {
+  return {
+    name: profile.name,
+    description: profile.description,
+    licenseNumber: profile.licenseNumber ?? '',
+    website: profile.website ?? '',
+    phone: profile.phone,
+    email: profile.email,
+    city: profile.city,
+    state: profile.state,
+    zip: profile.zip,
+    serviceRadiusMiles: profile.serviceRadiusMiles,
+    serviceStates: profile.serviceStates,
+    serviceCategoryIds: profile.serviceCategoryIds,
+    status: profile.status,
+  }
+}
+
+function companyPayload(draft: CompanyOnboardingDraft) {
+  return {
+    name: draft.name,
+    description: draft.description,
+    licenseNumber: draft.licenseNumber || undefined,
+    website: draft.website || undefined,
+    phone: draft.phone,
+    email: draft.email,
+    city: draft.city,
+    state: draft.state,
+    zip: draft.zip,
+    serviceRadiusMiles: Number(draft.serviceRadiusMiles),
+    serviceStates: draft.serviceStates,
+    serviceCategoryIds: draft.serviceCategoryIds,
+  }
+}
+
+function CompanyOnboardingWorkspace({
+  initialCompanyId,
   demoUser,
-  enabled = true,
   getToken,
 }: {
-  companyId: string
-  companyName?: string
+  initialCompanyId: string | null
   demoUser?: string
-  enabled?: boolean
   getToken?: () => Promise<string | null>
 }) {
-  const queryClient = useQueryClient()
-  const [draft, setDraft] = useState<{ companyId: string; states: string[] } | null>(null)
+  const [createdCompanyId, setCreatedCompanyId] = useState<string | null>(null)
+  const companyId = createdCompanyId ?? initialCompanyId
   const authOptions = async () => ({
     authToken: getToken ? await getToken() : null,
     demoUser,
   })
-  const serviceStatesQuery = useQuery({
-    queryKey: ['company-service-states', companyId],
-    enabled,
+  const categoriesQuery = useQuery({
+    queryKey: ['service-categories'],
+    queryFn: async () => apiRequest<ServiceCategory[]>('/service-categories'),
+    retry: false,
+  })
+  const profileQuery = useQuery({
+    queryKey: ['company-onboarding', companyId],
+    enabled: Boolean(companyId),
     queryFn: async () =>
-      apiRequest<ServiceStatesResponse>(
-        `/companies/${companyId}/service-states`,
+      apiRequest<CompanyOnboardingProfile>(
+        `/companies/${companyId}/onboarding`,
         undefined,
         await authOptions(),
       ),
     retry: false,
   })
-  const mutation = useMutation({
-    mutationFn: async (states: string[]) =>
-      apiRequest<ServiceStatesResponse>(
-        `/companies/${companyId}/service-states`,
+
+  if (companyId && profileQuery.isLoading) {
+    return <OnboardingStatusCard message="Loading company profile." />
+  }
+
+  const initialDraft = profileQuery.data
+    ? profileToDraft(profileQuery.data)
+    : blankOnboardingDraft()
+  const formKey = profileQuery.data
+    ? `${companyId}:${profileQuery.data.updatedAt ?? profileQuery.data.status}`
+    : (companyId ?? 'new-company')
+
+  return (
+    <CompanyOnboardingEditor
+      key={formKey}
+      companyId={companyId}
+      categories={categoriesQuery.data ?? []}
+      initialDraft={initialDraft}
+      loadError={profileQuery.error ?? categoriesQuery.error}
+      setCreatedCompanyId={setCreatedCompanyId}
+      demoUser={demoUser}
+      getToken={getToken}
+    />
+  )
+}
+
+function CompanyOnboardingEditor({
+  companyId,
+  categories,
+  initialDraft,
+  loadError,
+  setCreatedCompanyId,
+  demoUser,
+  getToken,
+}: {
+  companyId: string | null
+  categories: ServiceCategory[]
+  initialDraft: CompanyOnboardingDraft
+  loadError: unknown
+  setCreatedCompanyId: (companyId: string) => void
+  demoUser?: string
+  getToken?: () => Promise<string | null>
+}) {
+  const queryClient = useQueryClient()
+  const [draft, setDraft] = useState<CompanyOnboardingDraft>(() => initialDraft)
+  const authOptions = async () => ({
+    authToken: getToken ? await getToken() : null,
+    demoUser,
+  })
+
+  const saveMutation = useMutation({
+    mutationFn: async () =>
+      apiRequest<CompanyOnboardingSaveResponse>(
+        companyId ? `/companies/${companyId}/onboarding` : '/companies',
         {
-          method: 'PUT',
-          body: JSON.stringify({ states }),
+          method: companyId ? 'PATCH' : 'POST',
+          body: JSON.stringify(companyPayload(draft)),
         },
         await authOptions(),
       ),
     onSuccess: (data) => {
-      setDraft({ companyId, states: data.states })
-      queryClient.setQueryData(['company-service-states', companyId], data)
+      if (!companyId) {
+        setCreatedCompanyId(data.id)
+      }
+      setDraft((current) => ({
+        ...current,
+        status: data.status,
+        serviceCategoryIds: data.serviceCategoryIds ?? current.serviceCategoryIds,
+        serviceStates: data.serviceStates ?? current.serviceStates,
+      }))
+      void queryClient.invalidateQueries({ queryKey: ['company-onboarding', data.id] })
+      void queryClient.invalidateQueries({ queryKey: ['me'] })
+    },
+  })
+  const submitMutation = useMutation({
+    mutationFn: async () => {
+      if (!companyId) throw new Error('Save the draft before submitting.')
+      return apiRequest<{ id: string; status: string }>(
+        `/companies/${companyId}/submit-verification`,
+        { method: 'POST' },
+        await authOptions(),
+      )
+    },
+    onSuccess: (data) => {
+      setDraft((current) => ({ ...current, status: data.status }))
+      void queryClient.invalidateQueries({ queryKey: ['company-onboarding', data.id] })
     },
   })
 
-  const selectedStates =
-    draft?.companyId === companyId ? draft.states : (serviceStatesQuery.data?.states ?? [])
+  const updateDraft = <Key extends keyof CompanyOnboardingDraft>(
+    key: Key,
+    value: CompanyOnboardingDraft[Key],
+  ) => setDraft((current) => ({ ...current, [key]: value }))
   const toggleState = (code: string) => {
-    setDraft((current) => {
-      const source = current?.companyId === companyId ? current.states : selectedStates
-      const states = source.includes(code)
-        ? source.filter((state) => state !== code)
-        : [...source, code].sort()
-      return { companyId, states }
-    })
+    setDraft((current) => ({
+      ...current,
+      serviceStates: current.serviceStates.includes(code)
+        ? current.serviceStates.filter((state) => state !== code)
+        : [...current.serviceStates, code].sort(),
+    }))
   }
-  const error = mutation.error ?? serviceStatesQuery.error
+  const toggleCategory = (id: string) => {
+    setDraft((current) => ({
+      ...current,
+      serviceCategoryIds: current.serviceCategoryIds.includes(id)
+        ? current.serviceCategoryIds.filter((categoryId) => categoryId !== id)
+        : [...current.serviceCategoryIds, id],
+    }))
+  }
+  const error = saveMutation.error ?? submitMutation.error ?? loadError
   const errorMessage =
-    error instanceof ApiError ? error.message : error ? 'Service states could not be loaded.' : null
+    error instanceof ApiError
+      ? error.message
+      : error
+        ? 'The company profile could not be saved.'
+        : null
+  const saving = saveMutation.isPending || submitMutation.isPending
 
   return (
-    <Card className="mt-7 p-5">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 className="flex items-center gap-2 text-xl font-black">
-            <MapPin size={20} /> Service states
-          </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Select every state where {companyName} accepts leads.
-          </p>
-        </div>
-        <Button
-          className="gap-2"
-          disabled={selectedStates.length === 0 || mutation.isPending}
-          onClick={() => mutation.mutate(selectedStates)}
-        >
-          {mutation.isPending ? (
-            <LoaderCircle className="animate-spin" size={17} />
-          ) : (
-            <Save size={17} />
-          )}
-          Save states
-        </Button>
-      </div>
-      {serviceStatesQuery.isLoading ? (
-        <p className="mt-5 text-sm text-slate-600">Loading service states.</p>
-      ) : (
-        <fieldset className="mt-5">
-          <legend className="sr-only">Service states</legend>
-          <div className="grid max-h-72 gap-2 overflow-y-auto rounded-lg border border-slate-200 p-3 sm:grid-cols-2 xl:grid-cols-4">
-            {US_STATES.map((state) => (
-              <label
-                key={state.code}
-                className="flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                <input
-                  type="checkbox"
-                  className="size-4 rounded border-slate-300 accent-amber-500"
-                  checked={selectedStates.includes(state.code)}
-                  onChange={() => toggleState(state.code)}
-                />
-                <span>
-                  {state.name} ({state.code})
+    <form
+      className="mt-7"
+      onSubmit={(event) => {
+        event.preventDefault()
+        saveMutation.mutate()
+      }}
+    >
+      <Card className="p-5">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="flex items-center gap-2 text-xl font-black">
+              <Building2 size={20} /> Company onboarding
+            </h2>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <StatusBadge status={draft.status} />
+              {saveMutation.isSuccess ? (
+                <span className="text-sm font-semibold text-emerald-700">Draft saved.</span>
+              ) : null}
+              {submitMutation.isSuccess ? (
+                <span className="text-sm font-semibold text-emerald-700">
+                  Submitted for verification.
                 </span>
-              </label>
-            ))}
+              ) : null}
+            </div>
           </div>
-        </fieldset>
-      )}
-      <div className="mt-4 min-h-5 text-sm">
-        {mutation.isSuccess ? (
-          <p className="font-semibold text-emerald-700">Service states saved.</p>
-        ) : null}
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" className="gap-2" disabled={saving}>
+              {saveMutation.isPending ? (
+                <LoaderCircle className="animate-spin" size={17} />
+              ) : (
+                <Save size={17} />
+              )}
+              Save draft
+            </Button>
+            <SecondaryButton
+              className="gap-2"
+              disabled={!companyId || saving || draft.status === 'pending'}
+              onClick={() => submitMutation.mutate()}
+            >
+              {submitMutation.isPending ? (
+                <LoaderCircle className="animate-spin" size={17} />
+              ) : (
+                <BadgeCheck size={17} />
+              )}
+              Submit for review
+            </SecondaryButton>
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-6">
+          <div className="grid gap-5 md:grid-cols-2">
+            <Field id="company-name" label="Business name">
+              <input
+                id="company-name"
+                className="input"
+                value={draft.name}
+                onChange={(event) => updateDraft('name', event.target.value)}
+              />
+            </Field>
+            <Field id="company-email" label="Contact email">
+              <input
+                id="company-email"
+                type="email"
+                className="input"
+                value={draft.email}
+                onChange={(event) => updateDraft('email', event.target.value)}
+              />
+            </Field>
+            <Field id="company-phone" label="Contact phone">
+              <input
+                id="company-phone"
+                className="input"
+                value={draft.phone}
+                onChange={(event) => updateDraft('phone', event.target.value)}
+              />
+            </Field>
+            <Field id="company-website" label="Website">
+              <input
+                id="company-website"
+                type="url"
+                className="input"
+                value={draft.website}
+                onChange={(event) => updateDraft('website', event.target.value)}
+              />
+            </Field>
+            <Field id="company-license" label="License number">
+              <input
+                id="company-license"
+                className="input"
+                value={draft.licenseNumber}
+                onChange={(event) => updateDraft('licenseNumber', event.target.value)}
+              />
+            </Field>
+            <Field id="company-radius" label="Service radius">
+              <input
+                id="company-radius"
+                type="number"
+                min={1}
+                max={150}
+                className="input"
+                value={draft.serviceRadiusMiles}
+                onChange={(event) => updateDraft('serviceRadiusMiles', Number(event.target.value))}
+              />
+            </Field>
+            <Field id="company-city" label="City">
+              <input
+                id="company-city"
+                className="input"
+                value={draft.city}
+                onChange={(event) => updateDraft('city', event.target.value)}
+              />
+            </Field>
+            <Field id="company-state" label="State">
+              <select
+                id="company-state"
+                className="input"
+                value={draft.state}
+                onChange={(event) => updateDraft('state', event.target.value)}
+              >
+                {US_STATES.map((state) => (
+                  <option key={state.code} value={state.code}>
+                    {state.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field id="company-zip" label="ZIP code">
+              <input
+                id="company-zip"
+                className="input"
+                inputMode="numeric"
+                value={draft.zip}
+                onChange={(event) => updateDraft('zip', event.target.value)}
+              />
+            </Field>
+            <Field id="company-description" label="Description">
+              <textarea
+                id="company-description"
+                className="input min-h-32 resize-y md:col-span-2"
+                value={draft.description}
+                onChange={(event) => updateDraft('description', event.target.value)}
+              />
+            </Field>
+          </div>
+
+          <fieldset>
+            <legend className="text-sm font-semibold text-slate-800">Service categories</legend>
+            <div className="mt-2 grid gap-2 rounded-lg border border-slate-200 p-3 sm:grid-cols-2 xl:grid-cols-3">
+              {categories.map((category) => (
+                <label
+                  key={category.id}
+                  className="flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  <input
+                    type="checkbox"
+                    className="size-4 rounded border-slate-300 accent-amber-500"
+                    checked={draft.serviceCategoryIds.includes(category.id)}
+                    onChange={() => toggleCategory(category.id)}
+                  />
+                  <span>{category.name}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend className="text-sm font-semibold text-slate-800">Service states</legend>
+            <div className="mt-2 grid max-h-72 gap-2 overflow-y-auto rounded-lg border border-slate-200 p-3 sm:grid-cols-2 xl:grid-cols-4">
+              {US_STATES.map((state) => (
+                <label
+                  key={state.code}
+                  className="flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  <input
+                    type="checkbox"
+                    className="size-4 rounded border-slate-300 accent-amber-500"
+                    checked={draft.serviceStates.includes(state.code)}
+                    onChange={() => toggleState(state.code)}
+                  />
+                  <span>
+                    {state.name} ({state.code})
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        </div>
+
         {errorMessage ? (
-          <p className="font-semibold text-red-700" role="alert">
+          <p className="mt-4 text-sm font-semibold text-red-700" role="alert">
             {errorMessage}
           </p>
         ) : null}
-      </div>
-    </Card>
+      </Card>
+    </form>
   )
 }
 
-function ServiceStatesStatusCard({
+function StatusBadge({ status }: { status: string }) {
+  switch (status) {
+    case 'verified':
+      return (
+        <Badge tone="success">
+          <BadgeCheck className="mr-1 inline" size={14} /> Verified
+        </Badge>
+      )
+    case 'pending':
+      return <Badge tone="warning">Pending review</Badge>
+    case 'rejected':
+      return (
+        <Badge tone="warning">
+          <XCircle className="mr-1 inline" size={14} /> Changes requested
+        </Badge>
+      )
+    case 'suspended':
+      return (
+        <Badge tone="neutral">
+          <Ban className="mr-1 inline" size={14} /> Suspended
+        </Badge>
+      )
+    default:
+      return <Badge tone="neutral">Draft</Badge>
+  }
+}
+
+function OnboardingStatusCard({
   message,
   tone = 'neutral',
 }: {
@@ -414,7 +772,7 @@ function ServiceStatesStatusCard({
   return (
     <Card className="mt-7 p-5">
       <h2 className="flex items-center gap-2 text-xl font-black">
-        <MapPin size={20} /> Service states
+        <Building2 size={20} /> Company onboarding
       </h2>
       <p
         className={`mt-3 text-sm font-semibold ${tone === 'error' ? 'text-red-700' : 'text-slate-600'}`}
@@ -542,7 +900,100 @@ function ListRows({ items }: { items: string[][] }) {
   )
 }
 
+const demoPendingCompanies: AdminCompanySummary[] = [
+  {
+    id: 'pending-canyon',
+    name: 'Canyon Masonry Group',
+    description: 'Masonry repair and commercial concrete restoration awaiting review.',
+    licenseNumber: 'MSN-20481',
+    phone: '602-555-0101',
+    email: 'hello@canyonmasonry.example',
+    city: 'Phoenix',
+    state: 'AZ',
+    status: 'pending',
+  },
+  {
+    id: 'pending-riverbend',
+    name: 'Riverbend Plumbing Partners',
+    description: 'Plumbing repair and rough-in profile awaiting verification.',
+    licenseNumber: 'PLB-77192',
+    phone: '512-555-0107',
+    email: 'service@riverbendplumbing.example',
+    city: 'Austin',
+    state: 'TX',
+    status: 'pending',
+  },
+  {
+    id: 'pending-summit',
+    name: 'Summit Roofing Co.',
+    description: 'Roof repair and gutter profile awaiting verification.',
+    licenseNumber: 'RFG-44018',
+    phone: '801-555-0122',
+    email: 'hello@summitroof.example',
+    city: 'Salt Lake City',
+    state: 'UT',
+    status: 'pending',
+  },
+]
+
 export function AdminPage() {
+  if (appConfig.clerkPublishableKey) {
+    return <AuthenticatedAdminPage />
+  }
+
+  return <AdminDashboard demoUser="demo_admin" />
+}
+
+function AuthenticatedAdminPage() {
+  const { getToken } = useAuth()
+  return <AdminDashboard getToken={getToken} />
+}
+
+function AdminDashboard({
+  demoUser,
+  getToken,
+}: {
+  demoUser?: string
+  getToken?: () => Promise<string | null>
+}) {
+  const queryClient = useQueryClient()
+  const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({})
+  const authOptions = async () => ({
+    authToken: getToken ? await getToken() : null,
+    demoUser,
+  })
+  const pendingQuery = useQuery({
+    queryKey: ['admin-companies-pending'],
+    queryFn: async () =>
+      apiRequest<AdminCompanySummary[]>('/admin/companies/pending', undefined, await authOptions()),
+    retry: false,
+  })
+  const reviewMutation = useMutation({
+    mutationFn: async ({
+      companyId,
+      action,
+      reason,
+    }: {
+      companyId: string
+      action: 'approve' | 'reject' | 'suspend'
+      reason?: string
+    }) =>
+      apiRequest<{ id: string; status: string }>(
+        `/admin/companies/${companyId}/${action}`,
+        {
+          method: 'POST',
+          body: action === 'approve' ? undefined : JSON.stringify({ reason }),
+        },
+        await authOptions(),
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin-companies-pending'] })
+    },
+  })
+  const pendingCompanies = pendingQuery.data ?? (pendingQuery.isError ? demoPendingCompanies : [])
+  const reviewReason = (companyId: string) =>
+    reviewNotes[companyId] || 'Additional verification details are required.'
+
   return (
     <DashboardShell
       title="Trust and safety"
@@ -551,7 +1002,9 @@ export function AdminPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="p-5">
           <ShieldAlert className="text-amber-600" />
-          <p className="mt-4 text-3xl font-black">6</p>
+          <p className="mt-4 text-3xl font-black">
+            {pendingQuery.isLoading ? '--' : pendingCompanies.length}
+          </p>
           <p className="text-sm text-slate-500">Verification reviews</p>
         </Card>
         <Card className="p-5">
@@ -566,31 +1019,106 @@ export function AdminPage() {
         </Card>
       </div>
       <Card className="mt-6 p-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-black">Pending companies</h2>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-black">Pending companies</h2>
+            {pendingQuery.isError ? (
+              <p className="mt-1 text-sm font-semibold text-amber-800">
+                Showing demo verification records.
+              </p>
+            ) : null}
+          </div>
           <SecondaryButton>Open audit log</SecondaryButton>
         </div>
-        <div className="mt-5 grid gap-4">
-          {['Canyon Masonry Group', 'Riverbend Plumbing Partners', 'Summit Roofing Co.'].map(
-            (name) => (
-              <div
-                key={name}
-                className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 p-4"
-              >
-                <div>
-                  <p className="font-bold">{name}</p>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Business details and credentials awaiting review
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <SecondaryButton>Review</SecondaryButton>
-                  <Button>Approve</Button>
+        {pendingQuery.isLoading ? (
+          <p className="mt-5 text-sm font-semibold text-slate-600">Loading pending companies.</p>
+        ) : (
+          <div className="mt-5 grid gap-4">
+            {pendingCompanies.map((company) => (
+              <div key={company.id} className="rounded-xl border border-slate-200 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="max-w-3xl">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-bold">{company.name}</p>
+                      <StatusBadge status={company.status} />
+                    </div>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {company.city}, {company.state} - License {company.licenseNumber || 'not set'}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{company.description}</p>
+                    <p className="mt-2 text-xs font-semibold text-slate-500">
+                      {company.email} - {company.phone}
+                    </p>
+                  </div>
+                  <div className="grid min-w-72 gap-2">
+                    <input
+                      className="input min-h-10 text-sm"
+                      aria-label={`Review note for ${company.name}`}
+                      placeholder="Review note"
+                      value={reviewNotes[company.id] ?? ''}
+                      onChange={(event) =>
+                        setReviewNotes((current) => ({
+                          ...current,
+                          [company.id]: event.target.value,
+                        }))
+                      }
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        className="gap-2"
+                        disabled={reviewMutation.isPending}
+                        onClick={() =>
+                          reviewMutation.mutate({ companyId: company.id, action: 'approve' })
+                        }
+                      >
+                        <BadgeCheck size={17} /> Approve
+                      </Button>
+                      <SecondaryButton
+                        className="gap-2"
+                        disabled={reviewMutation.isPending}
+                        onClick={() =>
+                          reviewMutation.mutate({
+                            companyId: company.id,
+                            action: 'reject',
+                            reason: reviewReason(company.id),
+                          })
+                        }
+                      >
+                        <XCircle size={17} /> Request changes
+                      </SecondaryButton>
+                      <SecondaryButton
+                        className="gap-2"
+                        disabled={reviewMutation.isPending}
+                        onClick={() =>
+                          reviewMutation.mutate({
+                            companyId: company.id,
+                            action: 'suspend',
+                            reason: reviewReason(company.id),
+                          })
+                        }
+                      >
+                        <Ban size={17} /> Suspend
+                      </SecondaryButton>
+                    </div>
+                  </div>
                 </div>
               </div>
-            ),
-          )}
-        </div>
+            ))}
+            {pendingCompanies.length === 0 ? (
+              <div className="rounded-xl border border-slate-200 p-6 text-center">
+                <FilePenLine className="mx-auto text-slate-500" />
+                <p className="mt-3 font-bold">No pending companies</p>
+              </div>
+            ) : null}
+          </div>
+        )}
+        {reviewMutation.error ? (
+          <p className="mt-4 text-sm font-semibold text-red-700" role="alert">
+            {reviewMutation.error instanceof ApiError
+              ? reviewMutation.error.message
+              : 'The review action could not be completed.'}
+          </p>
+        ) : null}
       </Card>
     </DashboardShell>
   )

@@ -42,7 +42,7 @@ Do not reuse or modify the existing Invoice Maker Pages project or D1 database.
 ## Release gates
 
 - `npm run check` and `npm run test:e2e` pass.
-- Preview smoke tests cover search, quote, proposal, job, invoice, review, and moderation.
+- Preview smoke tests cover search, contractor onboarding, admin verification, quote, proposal, job, invoice, review, and moderation.
 - D1 Time Travel restore procedure is rehearsed.
 - Email SPF, DKIM, and DMARC pass.
 - Legal drafts have been reviewed and replaced where required.
